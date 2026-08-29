@@ -93,6 +93,35 @@ Linux detected the workstation's Intel Ethernet hardware, including:
 
 The public repository records controller models only. MAC addresses, assigned IP addresses, live interface names where unnecessary, and other network-specific identifiers are intentionally omitted.
 
+## NVIDIA Driver Baseline
+
+The NVIDIA display stack was validated before introducing any AMD GPUs.
+
+`nvidia-smi` reported:
+
+- GPU: **NVIDIA GeForce RTX 3050**
+- VRAM: **6144 MiB**
+- NVIDIA driver: **595.84**
+- Driver-reported CUDA compatibility: **13.2**
+- Idle temperature during validation: approximately **33°C**
+- Idle power draw during validation: approximately **6W**
+- Reported board power limit: **70W**
+
+The CUDA value shown by `nvidia-smi` represents the CUDA API level supported by the installed driver; it does **not** by itself confirm that a CUDA toolkit is installed.
+
+`lspci -k` confirmed:
+
+- NVIDIA GA107 / GeForce RTX 3050 6GB detected
+- **Kernel driver in use: `nvidia`**
+
+This provides a known-good proprietary NVIDIA driver baseline before AMD compute devices are added.
+
+## Package Update Check
+
+`sudo apt update` completed successfully and reported that the system packages were already up to date at this checkpoint.
+
+No AI runtime, ROCm stack, Vulkan tuning, Docker deployment, or local-model software has been installed yet.
+
 ## Baseline Validation Summary
 
 | Check | Result |
@@ -105,7 +134,10 @@ The public repository records controller models only. MAC addresses, assigned IP
 | WD Blue SN5000 2TB detected | PASS |
 | LUKS + LVM encrypted root active | PASS |
 | RTX 3050 detected over PCIe | PASS |
+| NVIDIA proprietary driver active | PASS — 595.84 |
+| `nvidia-smi` functional | PASS |
 | Intel Ethernet controllers detected | PASS |
+| Ubuntu package index current | PASS |
 | Radeon Pro V620 installed | No — intentionally deferred |
 
 ## Security / Documentation Policy
@@ -134,6 +166,8 @@ lscpu
 free -h
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MODEL
 lspci | grep -Ei 'vga|3d|display|non-volatile|ethernet'
+nvidia-smi
+lspci -k | grep -A3 -i nvidia
 ```
 
 These commands provide enough hardware inventory information to establish a reproducible baseline without exposing unnecessary network or device identifiers.
@@ -151,12 +185,27 @@ These commands provide enough hardware inventory information to establish a repr
 - [x] Confirm RTX 3050 PCIe detection
 - [x] Confirm Ethernet adapter detection
 - [x] Confirm encrypted-root storage layout
-- [ ] Apply OS updates
-- [ ] Validate NVIDIA driver state
-- [ ] Establish a clean Linux baseline before AMD/Vulkan/ROCm work
+- [x] Check package-update state
+- [x] Validate NVIDIA driver state
+- [x] Establish a clean Linux baseline before AMD/Vulkan/ROCm work
+
+## Next Hardware Checkpoint
+
+The next phase is **single-V620 integration**.
+
+Before power is applied to the first V620, the following must be validated:
+
+- Dedicated V620 fan shroud installation
+- Fan orientation and airflow direction
+- Fan power / control connection
+- Two native PCIe 8-pin power connections for the first V620
+- Physical clearance in Slot 2
+- BIOS Slot 2 Gen3 and Resizable BAR configuration already prepared
+
+The second V620 and auxiliary 10-pin GPU-power cable remain deferred until one V620 has been proven stable.
 
 ## Engineering Takeaway
 
-The Linux baseline validates the core workstation platform independently of the accelerator configuration. CPU topology, memory, NVMe storage, encryption, display GPU, and Ethernet hardware are all visible to Ubuntu before the V620s are introduced.
+The Linux baseline validates the core workstation platform independently of the accelerator configuration. CPU topology, memory, NVMe storage, encryption, display GPU, NVIDIA driver, and Ethernet hardware are all working before the V620s are introduced.
 
 This creates a strong fault-isolation point: any later problem that appears after adding GPU power, passive-GPU cooling, AMD drivers, Vulkan, ROCm, or multi-GPU inference can be compared against a documented known-good operating-system state.
