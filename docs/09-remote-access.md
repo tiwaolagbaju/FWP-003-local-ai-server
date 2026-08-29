@@ -9,6 +9,7 @@ The initial remote-access stack is:
 - OpenSSH Server
 - Tailscale
 - SSH public-key authentication
+- SSH client alias
 - Later: VS Code Remote SSH
 
 ## SSH Baseline
@@ -65,6 +66,7 @@ HP Z6 G4 AI Server
    |
    +-- OpenSSH
    +-- Ed25519 key authentication
+   +-- short SSH client alias
    +-- later: VS Code Remote SSH
    +-- later: browser-based AI services
 ```
@@ -102,6 +104,20 @@ This confirms:
 
 During setup, care was taken to distinguish the public key from the private key. The private key remains only on the office PC and is not stored in the repository or shared in screenshots.
 
+## SSH Client Alias
+
+A local OpenSSH client configuration entry was created on the office PC so the server can be reached using a short alias rather than repeatedly typing the full username, Tailscale host, and private-key path.
+
+The alias was validated successfully using:
+
+```text
+ssh z6
+```
+
+The actual Tailscale hostname and local key path details are not published in this repository. Public documentation records only the pattern and the successful result.
+
+This makes the remote workflow simpler and also provides a reusable connection profile for VS Code Remote SSH.
+
 ## Security / Documentation Policy
 
 Raw screenshots from this phase are not published directly because shell prompts, service logs, SSH configuration, and Tailscale status output can expose local identifiers.
@@ -134,19 +150,20 @@ The final public documentation will demonstrate the architecture and validation 
 | Dedicated Ed25519 key generated | **PASS** |
 | Public key installed on Z6 | **PASS** |
 | SSH key authentication validated | **PASS** |
-| Password SSH disabled | Pending — optional hardening after alias / VS Code validation |
+| Short SSH alias validated | **PASS — `ssh z6`** |
+| Password SSH disabled | Pending — optional hardening after VS Code validation |
 | VS Code Remote SSH validated | Pending |
 
 ## Next Validation
 
-The next checkpoint is to improve usability and then complete remote development access:
+The next checkpoint is to complete remote development access:
 
-1. Create a local SSH config entry on the office PC with a short alias for the Z6.
-2. Verify the alias uses the dedicated Ed25519 identity automatically.
-3. Install / configure VS Code Remote SSH to use the same SSH config entry.
-4. Validate interactive shell and file access through VS Code.
+1. Install the VS Code Remote - SSH extension on the office PC.
+2. Connect to the existing `z6` host entry from VS Code.
+3. Verify VS Code can open a remote terminal on the Z6.
+4. Verify a remote Linux folder can be browsed / edited from the office PC.
 5. Only after all key-based workflows are proven, consider disabling SSH password authentication.
 
 ## Engineering Takeaway
 
-The complete remote administration path is now validated from the office PC to the basement AI server using an encrypted Tailscale overlay, OpenSSH, and Ed25519 public-key authentication. The system can be administered securely without exposing SSH directly to the public internet or relying on reusable account passwords for normal access.
+The complete remote administration path is now validated from the office PC to the basement AI server using an encrypted Tailscale overlay, OpenSSH, Ed25519 public-key authentication, and a reusable SSH client profile. The system can be administered securely without exposing SSH directly to the public internet or relying on reusable account passwords for normal access.
