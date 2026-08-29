@@ -131,6 +131,34 @@ USB Storage Boot remains enabled so Ubuntu installation media can be used withou
 
 `After Power Loss` is currently set to **Power Off**. This is acceptable during bench configuration, but it will be reconsidered before the system is moved to its final basement-server role. An automatic recovery option may be preferable for a headless homelab server after an unexpected utility outage, provided the final configuration has been validated for safe unattended startup.
 
+## Advanced → Performance Options
+
+The performance page was reviewed and no changes were made.
+
+| Setting | Current Value | Decision |
+|---|---|---|
+| Turbo Mode | Enabled | Keep enabled |
+| Intel Hyper-Threading Technology | Enabled | Keep enabled |
+| Active CPU Cores Per Processor | All | Keep all cores enabled |
+| Sub-NUMA Clustering | Disabled | Leave disabled for baseline |
+| Isoc Mode | Disabled | Leave disabled |
+| Workload Configuration | Balanced | Leave unchanged for first benchmarks |
+| Performance Control | Performance Mode | Keep enabled |
+
+### Rationale
+
+**Turbo Mode** and **Hyper-Threading** are useful for the general-purpose CPU work this server will perform, including model loading, prompt processing, container workloads, decompression, and CPU/RAM offload. Disabling cores or threads at this stage would reduce available compute without solving a known problem.
+
+**Sub-NUMA Clustering** remains disabled for the first baseline. It can expose a more granular NUMA topology to software, but that adds complexity and is not needed to prove the initial multi-GPU configuration. NUMA tuning can be tested later if CPU-offloaded inference or memory-bandwidth benchmarks show a reason to investigate it.
+
+**Isoc Mode** remains disabled because the target workload is AI inference rather than a specialized isochronous / latency-reservation workload.
+
+**Workload Configuration = Balanced** will be kept for the first benchmark set so the machine begins from a conservative, reproducible configuration. If CPU-bound or offload-heavy tests later justify another profile, it will be changed and benchmarked as a separate experiment.
+
+**Performance Control = Performance Mode** is already aligned with the project's goal of maximizing sustained compute performance, so no change is required.
+
+HP's BIOS documentation exposes these same performance controls on the Z4/Z6-class workstation firmware; the current approach is to leave them stable until measured workloads give a reason to tune them further.
+
 ## BIOS Change Log
 
 | Setting | Previous | New | Reason | Validation |
@@ -161,8 +189,8 @@ BIOS changes are being treated as controlled experiments rather than undocumente
 - [x] Advanced → Slot Settings
 - [x] Enable Resizable BAR on Slots 2 and 5
 - [x] Advanced → Boot Options
+- [x] Advanced → Performance Options
 - [ ] Validate Resizable BAR with installed V620 hardware
-- [ ] Advanced → Performance Options
 - [ ] Storage / NVMe detection
 - [ ] Identify any additional Above-4G / large PCIe resource control if exposed elsewhere
 - [ ] Record Slot 4 settings for the RTX 3050
@@ -178,4 +206,4 @@ BIOS changes are being treated as controlled experiments rather than undocumente
 
 ## Engineering Takeaway
 
-The Z6 exposes enough low-level PCIe controls to make the multi-GPU configuration reproducible. Explicitly documenting each BIOS change—including original values, reasons, and later validation results—turns what could be trial-and-error tuning into a controlled integration and troubleshooting process.
+The Z6 exposes enough low-level PCIe and performance controls to make the multi-GPU configuration reproducible. Explicitly documenting each BIOS change—and equally documenting when settings are reviewed and deliberately left unchanged—turns what could be trial-and-error tuning into a controlled integration and troubleshooting process.
