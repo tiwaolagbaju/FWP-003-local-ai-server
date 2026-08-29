@@ -53,7 +53,7 @@ Authentication URLs, Tailscale IP addresses, node names, account identifiers, an
 
 ## Remote Access Architecture
 
-The intended administration path is:
+The validated administration path is:
 
 ```text
 Office PC
@@ -68,6 +68,20 @@ HP Z6 G4 AI Server
 ```
 
 The design avoids exposing SSH directly to the public internet. Remote access is provided through the private overlay network instead of WAN port-forwarding.
+
+## SSH Over Tailscale Validation
+
+A remote SSH session from the office PC to the Z6 was successfully established over Tailscale.
+
+This confirms:
+
+- the office PC and Z6 can communicate across the private tailnet
+- the Tailscale transport path is functioning
+- the Z6 SSH service is reachable over the overlay network
+- password-based SSH authentication works for the current Linux account
+- normal administration can now be performed remotely from the office PC
+
+The initial SSH login required verifying the correct Linux username and account password. No credentials were recorded in the project documentation.
 
 ## Security / Documentation Policy
 
@@ -95,22 +109,23 @@ The final public documentation will demonstrate the architecture and validation 
 | Tailscale installed | PASS |
 | Tailscale authenticated | **PASS** |
 | Z6 connected to tailnet | **PASS** |
-| Office PC can reach Z6 through Tailscale | Pending |
-| SSH from office PC validated | Pending |
+| Office PC can reach Z6 through Tailscale | **PASS** |
+| SSH from office PC validated | **PASS** |
 | SSH key authentication configured | Pending |
+| Password SSH disabled | Pending — do not change until key login is proven |
 | VS Code Remote SSH validated | Pending |
 
 ## Next Validation
 
-The next checkpoint is to test the full remote path from the office PC:
+The next checkpoint is to replace password-based remote administration with SSH public-key authentication:
 
-1. Confirm the office PC is connected to the same Tailscale network.
-2. Verify basic reachability to the Z6 through Tailscale.
-3. Establish an SSH session from the office PC.
-4. Once password-based SSH is proven, configure Ed25519 key authentication.
-5. Disable SSH password authentication only after key-based login has been validated in a separate session.
+1. Generate an Ed25519 key pair on the office PC if one does not already exist.
+2. Install only the public key on the Z6.
+3. Open a new, separate SSH session and prove key-based login works.
+4. Keep the existing working SSH session open while testing to avoid accidental lockout.
+5. Only after successful key authentication, consider disabling SSH password authentication.
 6. Add VS Code Remote SSH as the preferred development / administration workflow.
 
 ## Engineering Takeaway
 
-Remote administration is being built as a separate, testable layer rather than exposing services directly to the public internet. SSH was validated first, Tailscale was then added as the secure transport layer, and live addressing / authentication information is deliberately excluded from public project artifacts.
+The complete remote administration path is now validated from the office PC to the basement AI server using an encrypted Tailscale overlay and OpenSSH. The next security improvement is to remove dependence on reusable account passwords by moving to SSH public-key authentication, while preserving rollback access until the key-based path is proven.
