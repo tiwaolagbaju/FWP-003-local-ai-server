@@ -101,7 +101,22 @@ These are healthy idle temperatures for the modified passive V620 cooling setup.
 
 These readings validate only the **idle state**. The fan shroud and airflow design will not be considered fully validated until temperatures are monitored under sustained GPU compute load.
 
-The initial attempt to read `/sys/class/drm/.../temp1_input` manually was malformed at the shell prompt and produced command errors. Installing `lm-sensors` provided a cleaner and more reliable way to read the AMD GPU's exposed hwmon telemetry, so `sensors` will be used as the primary thermal-validation tool for this phase.
+## PCIe Endpoint Link Observation
+
+Verbose PCIe inspection of the **V620 GPU endpoint** at `23:00.0` reported:
+
+```text
+LnkCap: Speed 16GT/s, Width x16
+LnkSta: Speed 16GT/s, Width x16
+```
+
+This corresponds to a PCIe 4.0 x16-capable link and shows that the endpoint-to-switch connection is operating at its full advertised width and speed.
+
+However, the V620 contains an onboard PCIe switch. Because the Z6 G4 host slot itself is a PCIe Gen3 platform, the `23:00.0` reading should **not** be interpreted as proof that the workstation slot is operating at PCIe Gen4.
+
+The host-facing link still needs to be checked on the switch's **upstream port** (`21:00.0`). The expected host-side result is Gen3 / 8GT/s at x16 if Slot 2 is negotiating correctly with the Z6.
+
+This distinction is intentionally documented so the final project does not overstate the platform's PCIe capability.
 
 ## Current Result
 
@@ -115,19 +130,20 @@ The initial attempt to read `/sys/class/drm/.../temp1_input` manually was malfor
 | `amdgpu` driver bound | **PASS** |
 | Usable VRAM initialized | **PASS — ~30,704 MiB** |
 | 32GB PCIe BAR allocated | **PASS — 32,768 MiB** |
-| Resizable BAR / large BAR behavior | **Strong initial PASS; final validation pending PCIe inspection** |
+| Resizable BAR / large BAR behavior | **Strong initial PASS** |
 | V620 temperature telemetry visible | **PASS** |
 | Idle thermals | **PASS — edge 43°C / junction 45°C / memory 42°C** |
 | Idle GPU power telemetry | **PASS — ~7 W** |
-| PCIe Gen3 link validated | Pending |
+| V620 endpoint link | **PASS — 16GT/s x16** |
+| Z6 host-facing PCIe Gen3 link | Pending upstream-port check |
 | Sustained load thermal test | Pending |
 
 ## Next Validation Steps
 
 Before installing ROCm or a full AI stack:
 
-1. Inspect PCIe link capability, negotiated generation, and link width.
-2. Inspect the Resizable BAR capability directly with verbose PCIe information.
+1. Inspect the V620 switch upstream port at `21:00.0` to verify the **host-facing** link is Gen3 x16.
+2. Confirm the 32GB memory region directly in verbose PCIe output.
 3. Install Vulkan tooling.
 4. Confirm the V620 appears as a Vulkan-capable device.
 5. Run a simple single-GPU compute / inference workload while monitoring `sensors`.
@@ -140,6 +156,6 @@ The raw terminal photographs used for this validation are not being published di
 
 ## Engineering Takeaway
 
-The first V620 has progressed beyond simple POST detection: Ubuntu recognizes it by model, the kernel binds the correct AMD driver, the expected GDDR6 memory is initialized, the system allocates a full 32GB PCIe BAR, and hardware telemetry is accessible from Linux.
+The first V620 has progressed beyond simple POST detection: Ubuntu recognizes it by model, the kernel binds the correct AMD driver, the expected GDDR6 memory is initialized, the system allocates a full 32GB PCIe BAR, hardware telemetry is accessible from Linux, and the GPU endpoint link itself is healthy at x16.
 
-The card is also idling at healthy temperatures with the custom cooling approach, creating a strong baseline for the next stage: PCIe verification followed by controlled compute-load thermal testing.
+The remaining PCIe question is specifically the Z6-to-card host link, which is being verified independently because the V620's onboard PCIe switch can otherwise make the endpoint speed easy to misinterpret.
