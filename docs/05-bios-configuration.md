@@ -44,25 +44,25 @@ The Z6 exposes per-slot PCIe controls, including speed limits, bifurcation, Opti
 
 ### Slot 2 — Planned V620 #1
 
-Observed / configured:
+Configured:
 
 - Slot enabled
 - Option ROM Download: Enabled
-- Limit PCIe Speed changed from `Auto` to **Gen3 (8 Gbps)**
+- Limit PCIe Speed: **Gen3 (8 Gbps)**
 - Bifurcation: Auto
-- Resizable BAR: currently **Disabled**
+- Resizable BAR: **Enabled**
 
 HP documents Slot 2 as a CPU-connected **PCIe Gen3 x16** slot, so forcing Gen3 matches the platform's native capability.
 
 ### Slot 5 — Planned V620 #2
 
-Observed / configured:
+Configured:
 
 - Slot enabled
 - Option ROM Download: Enabled
-- Limit PCIe Speed changed from `Auto` to **Gen3 (8 Gbps)**
+- Limit PCIe Speed: **Gen3 (8 Gbps)**
 - Bifurcation: Auto
-- Resizable BAR: currently **Disabled**
+- Resizable BAR: **Enabled**
 
 HP documents Slot 5 as a CPU-connected **PCIe Gen3 x16** slot, so forcing Gen3 also matches the native capability of this slot.
 
@@ -80,16 +80,21 @@ The BIOS currently reports `Current PCIe Speed: Gen1 (2.5 Gbps)` on empty / ligh
 
 ## Resizable BAR
 
-Resizable BAR controls are visible per slot and are currently **Disabled** on the two planned V620 slots.
+Resizable BAR controls are exposed per slot on the Z6 G4.
 
-This is the next PCIe setting to evaluate. The reference dual-V620 build enabled Resizable BAR, and AMD's Linux guidance recommends enabling Resizable BAR together with large-address-space support for some large-BAR GPU configurations.
+The settings for both planned V620 slots were changed from `Disable` to **Enable**:
 
-The intended next test configuration is therefore:
+- Slot 2 Resizable BAR → **Enabled**
+- Slot 5 Resizable BAR → **Enabled**
 
-- Slot 2 Resizable BAR → **Enable**
-- Slot 5 Resizable BAR → **Enable**
+The change mirrors the known-working dual-V620 reference build and provides a controlled starting point for large-BAR GPU initialization. The RTX 3050 slot is intentionally being left on its stable/default configuration unless later testing provides a reason to change it.
 
-The RTX 3050 slot will be left unchanged unless testing or the software stack provides a reason to modify it.
+Resizable BAR will be considered validated only after:
+
+1. The system successfully POSTs with the V620 hardware installed.
+2. Linux enumerates both GPUs.
+3. `lspci` confirms the expected BAR/resource allocation.
+4. Vulkan or the selected inference backend can address both devices correctly.
 
 ## BIOS Change Log
 
@@ -98,6 +103,8 @@ The RTX 3050 slot will be left unchanged unless testing or the software stack pr
 | PCIe MMIO Assignment Mode | Auto | 32 Bit | Match known-working dual-V620 reference configuration | Pending |
 | Slot 2 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x16 capability and reduce link-training uncertainty | Pending |
 | Slot 5 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x16 capability and reduce link-training uncertainty | Pending |
+| Slot 2 Resizable BAR | Disable | Enable | Prepare V620 #1 for large-BAR / multi-GPU testing | Pending |
+| Slot 5 Resizable BAR | Disable | Enable | Prepare V620 #2 for large-BAR / multi-GPU testing | Pending |
 | M.2 SSD0 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x4 M.2 interface | Pending OS validation |
 | M.2 SSD1 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x4 M.2 interface | Pending OS validation |
 
@@ -116,7 +123,8 @@ BIOS changes are being treated as controlled experiments rather than undocumente
 ## Remaining BIOS Pages / Settings to Inspect
 
 - [x] Advanced → Slot Settings
-- [ ] Enable and validate Resizable BAR on Slots 2 and 5
+- [x] Enable Resizable BAR on Slots 2 and 5
+- [ ] Validate Resizable BAR with installed V620 hardware
 - [ ] Advanced → Boot Options
 - [ ] Advanced → Performance Options
 - [ ] Storage / NVMe detection
@@ -127,9 +135,9 @@ BIOS changes are being treated as controlled experiments rather than undocumente
 
 | Slot | Planned Device | PCIe Target |
 |---|---|---|
-| Slot 2 | Radeon Pro V620 #1 | Gen3 x16, Resizable BAR enabled if validated |
+| Slot 2 | Radeon Pro V620 #1 | Gen3 x16, Resizable BAR enabled |
 | Slot 4 | NVIDIA RTX 3050 | Leave on stable/default configuration initially |
-| Slot 5 | Radeon Pro V620 #2 | Gen3 x16, Resizable BAR enabled if validated |
+| Slot 5 | Radeon Pro V620 #2 | Gen3 x16, Resizable BAR enabled |
 
 ## Engineering Takeaway
 
