@@ -15,41 +15,49 @@ The goal is to identify the settings that affect large PCIe devices, multi-GPU r
 
 ## Advanced → System Options
 
-The following values were observed before any changes were made:
+The following values were observed during BIOS inspection:
 
-| Setting | Observed Value | Current Decision |
-|---|---|---|
-| sSATA Controller | Enabled | Leave unchanged |
-| sSATA Controller RAID Mode | Enabled | Review later only if storage configuration requires it |
-| 1TB Memory Cap | Auto | Leave unchanged |
-| **PCIe MMIO Assignment Mode** | **32 Bit** | **Leave at 32 Bit for initial V620 testing** |
-| PCIe Training Reset | Disable | Leave unchanged for now |
-| PCIe ACS | Enable | Leave unchanged for now |
-| Power Button Override | 4 sec | Unrelated to GPU bring-up |
+| Setting | Original / Observed State | Current State | Decision |
+|---|---|---|---|
+| sSATA Controller | Enabled | Enabled | Leave unchanged |
+| sSATA Controller RAID Mode | Enabled | Enabled | Review later only if storage configuration requires it |
+| 1TB Memory Cap | Auto | Auto | Leave unchanged |
+| **PCIe MMIO Assignment Mode** | **Auto** | **32 Bit** | Intentionally changed for initial V620 testing based on the reference build |
+| PCIe Training Reset | Disable | Disable | Leave unchanged for now |
+| PCIe ACS | Enable | Enable | Leave unchanged for now |
+| Power Button Override | 4 sec | 4 sec | Unrelated to GPU bring-up |
 
 ## PCIe MMIO Assignment Mode
 
-The most important finding on this page is that **PCIe MMIO Assignment Mode is already set to 32 Bit**.
+The HP Z6 G4 BIOS originally had **PCIe MMIO Assignment Mode set to Auto**.
 
-This matches the configuration used in the dual-V620 HP Z4 reference build, where the creator reported that the system would not boot correctly with the large-GPU configuration unless this setting was configured appropriately.
+During baseline BIOS inspection, this setting was intentionally changed to **32 Bit** before the configuration photo was taken. The change was made because the dual-V620 HP Z4 reference build specifically used 32-bit MMIO assignment and reported boot issues when the required PCIe resource settings were not configured correctly.
 
-Because the Z6 is already set to 32 Bit, no change is required at this checkpoint.
+This is therefore a **documented configuration change**, not the factory/default state of this workstation.
 
-This setting will be validated empirically once the V620s are installed rather than changed preemptively.
+### Change Record
+
+- Previous value: `Auto`
+- New value: `32 Bit`
+- Reason: reproduce the known-working MMIO configuration from the dual-V620 reference build as a controlled starting point
+- Validation status: pending V620 installation and POST testing
+
+If later testing shows that `Auto` or another setting is more appropriate on the Z6 G4, the configuration will be reverted or adjusted and the result documented.
 
 ## Current BIOS Change Policy
 
-No BIOS settings will be changed simply to imitate the reference video.
+BIOS changes will be treated as controlled experiments rather than undocumented tweaks.
 
 The process is:
 
-1. Record the Z6 default/current state.
-2. Identify the equivalent Z4 setting from the reference build.
-3. Determine whether the Z6 already satisfies that requirement.
-4. Change only settings that are necessary for successful hardware initialization.
-5. Record every change and the resulting system behavior.
+1. Record the original Z6 state whenever possible.
+2. Identify the equivalent setting used in the Z4 reference build.
+3. Make one relevant change at a time.
+4. Record the reason for the change.
+5. Validate POST, device detection, and system stability.
+6. Revert or revise a setting if testing does not support it.
 
-This preserves a known-good baseline and makes troubleshooting reversible.
+This preserves a troubleshooting trail and makes the final build reproducible.
 
 ## Remaining BIOS Pages to Inspect
 
@@ -73,4 +81,4 @@ No slot-speed changes will be made until the actual Slot Settings page is review
 
 ## Engineering Takeaway
 
-The Z6 BIOS already contains a platform-specific PCIe MMIO control that directly relates to the large-address-space requirements of multi-GPU configurations. Recording the current state before modifying anything reduces risk and creates a defensible troubleshooting record for the final portfolio documentation.
+The Z6 BIOS exposes a platform-specific PCIe MMIO control that may be important for allocating address space to multiple large GPUs. More importantly, the configuration process is being documented as a sequence of intentional, reversible changes rather than presenting modified values as defaults.
