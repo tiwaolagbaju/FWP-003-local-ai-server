@@ -8,7 +8,8 @@ The initial remote-access stack is:
 
 - OpenSSH Server
 - Tailscale
-- Later: SSH key authentication and VS Code Remote SSH
+- SSH public-key authentication
+- Later: VS Code Remote SSH
 
 ## SSH Baseline
 
@@ -63,6 +64,7 @@ Office PC
 HP Z6 G4 AI Server
    |
    +-- OpenSSH
+   +-- Ed25519 key authentication
    +-- later: VS Code Remote SSH
    +-- later: browser-based AI services
 ```
@@ -83,9 +85,26 @@ This confirms:
 
 The initial SSH login required verifying the correct Linux username and account password. No credentials were recorded in the project documentation.
 
+## Ed25519 SSH Key Authentication
+
+A dedicated Ed25519 SSH key pair was generated on the office PC for this server workflow.
+
+The public key was added to the Linux user's `~/.ssh/authorized_keys` file and permissions were set appropriately.
+
+A separate SSH session was then opened using the dedicated private key. The connection succeeded, validating public-key authentication.
+
+This confirms:
+
+- the office PC possesses the required private key
+- the Z6 recognizes the matching public key
+- SSH public-key authentication is functional over Tailscale
+- reusable Ubuntu account passwords are no longer required for normal remote administration from this client
+
+During setup, care was taken to distinguish the public key from the private key. The private key remains only on the office PC and is not stored in the repository or shared in screenshots.
+
 ## Security / Documentation Policy
 
-Raw screenshots from this phase are not published directly because shell prompts, service logs, and Tailscale status output can expose local identifiers.
+Raw screenshots from this phase are not published directly because shell prompts, service logs, SSH configuration, and Tailscale status output can expose local identifiers.
 
 The final public documentation will demonstrate the architecture and validation results while omitting:
 
@@ -94,7 +113,8 @@ The final public documentation will demonstrate the architecture and validation 
 - LAN IP addresses
 - Tailscale IP addresses
 - authentication URLs
-- SSH keys / fingerprints
+- SSH private keys
+- full public keys or fingerprints
 - MAC addresses
 - account identifiers
 
@@ -111,21 +131,22 @@ The final public documentation will demonstrate the architecture and validation 
 | Z6 connected to tailnet | **PASS** |
 | Office PC can reach Z6 through Tailscale | **PASS** |
 | SSH from office PC validated | **PASS** |
-| SSH key authentication configured | Pending |
-| Password SSH disabled | Pending — do not change until key login is proven |
+| Dedicated Ed25519 key generated | **PASS** |
+| Public key installed on Z6 | **PASS** |
+| SSH key authentication validated | **PASS** |
+| Password SSH disabled | Pending — optional hardening after alias / VS Code validation |
 | VS Code Remote SSH validated | Pending |
 
 ## Next Validation
 
-The next checkpoint is to replace password-based remote administration with SSH public-key authentication:
+The next checkpoint is to improve usability and then complete remote development access:
 
-1. Generate an Ed25519 key pair on the office PC if one does not already exist.
-2. Install only the public key on the Z6.
-3. Open a new, separate SSH session and prove key-based login works.
-4. Keep the existing working SSH session open while testing to avoid accidental lockout.
-5. Only after successful key authentication, consider disabling SSH password authentication.
-6. Add VS Code Remote SSH as the preferred development / administration workflow.
+1. Create a local SSH config entry on the office PC with a short alias for the Z6.
+2. Verify the alias uses the dedicated Ed25519 identity automatically.
+3. Install / configure VS Code Remote SSH to use the same SSH config entry.
+4. Validate interactive shell and file access through VS Code.
+5. Only after all key-based workflows are proven, consider disabling SSH password authentication.
 
 ## Engineering Takeaway
 
-The complete remote administration path is now validated from the office PC to the basement AI server using an encrypted Tailscale overlay and OpenSSH. The next security improvement is to remove dependence on reusable account passwords by moving to SSH public-key authentication, while preserving rollback access until the key-based path is proven.
+The complete remote administration path is now validated from the office PC to the basement AI server using an encrypted Tailscale overlay, OpenSSH, and Ed25519 public-key authentication. The system can be administered securely without exposing SSH directly to the public internet or relying on reusable account passwords for normal access.
