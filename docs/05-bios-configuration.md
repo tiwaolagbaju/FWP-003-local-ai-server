@@ -96,6 +96,41 @@ Resizable BAR will be considered validated only after:
 3. `lspci` confirms the expected BAR/resource allocation.
 4. Vulkan or the selected inference backend can address both devices correctly.
 
+## Advanced → Boot Options
+
+The Boot Options page was inspected during baseline setup.
+
+Observed / configured values:
+
+- Startup Delay: 0 seconds
+- **Fast Boot: Disabled**
+- CD-ROM Boot: Enabled
+- USB Storage Boot: Enabled
+- SD Card Boot: Disabled
+- Network (PXE) Boot: Disabled
+- After Boot Device Not Found: Stop
+- After Power Loss: Power Off
+- Prompt on Memory Size Change: Enabled
+- UEFI Boot Order: Enabled
+
+### Fast Boot
+
+Fast Boot was intentionally disabled for the hardware-integration phase.
+
+The reason is not expected AI performance; it is **troubleshooting reliability**. During a multi-GPU bring-up, a normal/full POST gives firmware more opportunity to initialize and train PCIe devices, exposes hardware warnings more consistently, and makes it easier to enter BIOS or diagnostics when a change causes a problem.
+
+This also matches the reference dual-V620 build, which left Fast Boot disabled during setup.
+
+Fast Boot may be revisited after the final system is stable, but there is little benefit to enabling it on a remotely administered server where predictable hardware initialization is more valuable than saving a few seconds during boot.
+
+### USB Storage Boot
+
+USB Storage Boot remains enabled so Ubuntu installation media can be used without another BIOS change.
+
+### After Power Loss
+
+`After Power Loss` is currently set to **Power Off**. This is acceptable during bench configuration, but it will be reconsidered before the system is moved to its final basement-server role. An automatic recovery option may be preferable for a headless homelab server after an unexpected utility outage, provided the final configuration has been validated for safe unattended startup.
+
 ## BIOS Change Log
 
 | Setting | Previous | New | Reason | Validation |
@@ -107,6 +142,7 @@ Resizable BAR will be considered validated only after:
 | Slot 5 Resizable BAR | Disable | Enable | Prepare V620 #2 for large-BAR / multi-GPU testing | Pending |
 | M.2 SSD0 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x4 M.2 interface | Pending OS validation |
 | M.2 SSD1 PCIe speed limit | Auto | Gen3 | Match Z6 native Gen3 x4 M.2 interface | Pending OS validation |
+| Fast Boot | Enabled | Disabled | Improve visibility and consistency during PCIe / multi-GPU bring-up | Baseline BIOS change |
 
 ## Current BIOS Change Policy
 
@@ -124,12 +160,13 @@ BIOS changes are being treated as controlled experiments rather than undocumente
 
 - [x] Advanced → Slot Settings
 - [x] Enable Resizable BAR on Slots 2 and 5
+- [x] Advanced → Boot Options
 - [ ] Validate Resizable BAR with installed V620 hardware
-- [ ] Advanced → Boot Options
 - [ ] Advanced → Performance Options
 - [ ] Storage / NVMe detection
 - [ ] Identify any additional Above-4G / large PCIe resource control if exposed elsewhere
 - [ ] Record Slot 4 settings for the RTX 3050
+- [ ] Revisit `After Power Loss` before final headless deployment
 
 ## Planned GPU Slot Targets
 
