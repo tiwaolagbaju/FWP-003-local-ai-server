@@ -18,6 +18,21 @@ This confirms that one V620 can coexist with the NVIDIA RTX 3050 display GPU usi
 - **AMD Radeon Pro V620 #1 installed in Slot 2**
 - V620 #2 not installed
 
+## Temporary Cooling Configuration
+
+The first V620 is **not yet using the planned final cooling assembly**.
+
+Current temporary setup:
+
+- One Noctua 40×20 mm fan
+- Fan temporarily secured directly to the V620 with a zip tie
+- Ordered dual-fan shroud has not yet arrived
+- Planned final configuration remains two 40×20 mm fans per V620 with a dedicated shroud that directs airflow through the passive heatsink
+
+This distinction is important because the V620 is a passive server accelerator designed around directed chassis airflow. A single small fan can provide enough airflow for BIOS, Linux enumeration, Vulkan detection, and idle validation, but it has **not** been demonstrated to provide adequate cooling under sustained compute load.
+
+Accordingly, no prolonged AI inference, stress test, or thermal benchmark will be performed with the temporary single-fan arrangement.
+
 ## Relevant BIOS State
 
 - PCIe MMIO Assignment Mode: 32 Bit
@@ -103,9 +118,9 @@ Idle readings observed during validation:
 | Reported power cap | **250 W** |
 | Memory clock | **~96 MHz** |
 
-These are healthy idle temperatures for the modified passive V620 cooling setup. The small difference between edge and junction temperature also indicates that the card is not showing an obvious localized hotspot at idle.
+These are healthy **idle** temperatures with the temporary one-fan setup. They confirm that basic airflow is present, but they do **not** validate the cooling arrangement for sustained compute.
 
-These readings validate only the **idle state**. The fan shroud and airflow design will not be considered fully validated until temperatures are monitored under sustained GPU compute load.
+Because the card exposes a 250W power cap and was designed for directed server airflow, the final shroud / dual-fan arrangement must be installed and tested before thermal performance under AI load is considered safe or complete.
 
 ## PCIe Link Validation
 
@@ -166,24 +181,28 @@ No unique Vulkan device UUIDs or raw terminal screenshots are being published in
 | 32GB PCIe BAR allocated | **PASS — 32GB** |
 | Resizable BAR / large BAR behavior | **PASS** |
 | V620 temperature telemetry visible | **PASS** |
-| Idle thermals | **PASS — edge 43°C / junction 45°C / memory 42°C** |
+| Idle thermals | **PASS — temporary single-fan setup only** |
 | Idle GPU power telemetry | **PASS — ~7 W** |
 | V620 endpoint link | **PASS — 16GT/s x16** |
 | Z6 host-facing PCIe link | **PASS — 8GT/s / Gen3 x16** |
 | V620 available through Vulkan / RADV | **PASS** |
-| Actual AI compute workload | Pending |
-| Sustained load thermal test | Pending |
+| Final dual-fan shroud installed | **Pending** |
+| Actual sustained AI compute workload | **Deferred pending final cooling** |
+| Sustained load thermal test | **Deferred pending final cooling** |
 
 ## Next Validation Steps
 
-The first V620 is now ready for an actual AI workload test:
+While waiting for the cooling shroud, software-only checks that do not meaningfully load the GPU can continue. Sustained inference and thermal benchmarking are deferred.
 
-1. Build `llama.cpp` with the Vulkan backend enabled.
-2. Confirm `llama.cpp` lists the V620 as a usable Vulkan device.
-3. Run a small GGUF model entirely on the V620.
-4. Monitor `sensors` during inference.
-5. Record model, quantization, load time, tokens/second, VRAM utilization, GPU power, edge temperature, junction temperature, and memory temperature.
-6. If the single-card AI workload and cooling test pass, introduce the second V620 and repeat PCIe / BAR / Vulkan validation before multi-GPU inference testing.
+Next hardware steps:
+
+1. Install the dedicated V620 shroud when it arrives.
+2. Install two 40×20 mm fans in the intended airflow direction.
+3. Verify the shroud seals / directs airflow through the passive heatsink rather than around it.
+4. Re-record idle temperatures with the final cooling configuration.
+5. Run the first controlled inference workload while continuously monitoring `sensors`.
+6. Record edge, junction, memory temperature, and power during load.
+7. Only after cooling validation passes, introduce the second V620.
 
 ## Security / Documentation Note
 
@@ -191,6 +210,6 @@ The raw terminal photographs used for validation are not being published directl
 
 ## Engineering Takeaway
 
-The first V620 is now validated from firmware through the graphics-compute API layer: Ubuntu recognizes it, `amdgpu` binds correctly, the expected VRAM is initialized, a full 32GB PCIe BAR is allocated, the Z6 host connection negotiates correctly at PCIe Gen3 x16, healthy idle telemetry is available, and Mesa RADV exposes the card as a Vulkan-capable discrete GPU.
+The first V620 is validated from firmware through the Vulkan API layer, but thermal validation is intentionally being kept separate from software validation. The temporary single-fan arrangement is sufficient for low-power bring-up and enumeration; it is not being treated as a production cooling solution.
 
-This creates a strong single-GPU baseline before the first real AI inference benchmark and before introducing the second 32GB accelerator.
+Deferring sustained load until the engineered dual-fan shroud is installed preserves hardware safety and creates a more defensible benchmark methodology for the final portfolio documentation.
