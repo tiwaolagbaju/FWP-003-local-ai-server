@@ -4,9 +4,9 @@
 
 The HP Z6 G4 successfully completed POST and booted Ubuntu 26.04.1 LTS with the first AMD Radeon Pro V620 installed in the planned Slot 2 position.
 
-Linux then successfully enumerated the V620, bound it to the in-kernel `amdgpu` driver, initialized the GPU, exposed a full 32GB PCIe BAR for the card, and provided working thermal / power telemetry through `lm-sensors`.
+Linux successfully enumerated the V620, bound it to the in-kernel `amdgpu` driver, initialized the GPU, exposed a full 32GB PCIe BAR, provided working thermal / power telemetry, and exposed the accelerator to Vulkan through Mesa RADV.
 
-This is the first successful accelerator-integration checkpoint and confirms that one V620 can coexist with the NVIDIA RTX 3050 display GPU using the current BIOS configuration.
+This confirms that one V620 can coexist with the NVIDIA RTX 3050 display GPU using the current BIOS and Linux configuration without requiring ROCm for basic Vulkan access.
 
 ## Configuration at This Checkpoint
 
@@ -42,7 +42,7 @@ Kernel driver in use: amdgpu
 Kernel modules: amdgpu
 ```
 
-This is an important result because no separate ROCm package was required for basic Linux device initialization. The standard Ubuntu kernel driver already recognizes and initializes the card.
+No separate ROCm package was required for basic Linux device initialization. The standard Ubuntu kernel driver recognizes and initializes the card.
 
 ## VRAM and BAR Initialization
 
@@ -84,7 +84,7 @@ The driver also reported:
 - SMU initialization successful
 - DRM device registration
 
-A message stating that the driver could not find a CRTC / display size was observed near the end of initialization. This is expected to be non-critical for the current use case because the V620 is being used as a **headless compute accelerator** while the RTX 3050 provides the actual display output.
+A message stating that the driver could not find a CRTC / display size was observed near the end of initialization. This is expected to be non-critical because the V620 is being used as a **headless compute accelerator** while the RTX 3050 provides display output.
 
 An early VBIOS / ROM alignment warning was also observed. Because the driver subsequently fetched the VBIOS, initialized the GPU, exposed the expected VRAM/BAR sizes, and completed DRM registration, it is being documented for awareness rather than treated as a failure at this checkpoint.
 
@@ -130,9 +130,27 @@ This confirms the actual workstation-to-card connection is:
 - **PCIe Gen3** — 8 GT/s
 - **x16 link width**
 
-The word `downgraded` is expected here. The V620's onboard switch supports PCIe Gen4, while the HP Z6 G4 host platform provides PCIe Gen3. The link therefore negotiates down to the fastest common generation while retaining the full x16 width.
+The word `downgraded` is expected here. The V620's onboard switch supports PCIe Gen4, while the HP Z6 G4 host platform provides PCIe Gen3. The link therefore negotiates to the fastest common generation while retaining the full x16 width.
 
-This is the exact target for Slot 2 and confirms that the manually configured Gen3 limit is functioning correctly.
+## Vulkan Validation
+
+Vulkan tooling was installed using Ubuntu's `vulkan-tools` and Mesa Vulkan packages.
+
+`vulkaninfo --summary` successfully enumerated three Vulkan devices:
+
+| Vulkan Device | Driver Path | Result |
+|---|---|---|
+| NVIDIA GeForce RTX 3050 | NVIDIA proprietary Vulkan driver | PASS |
+| **AMD Radeon Pro V620 (RADV NAVI21)** | **Mesa RADV** | **PASS** |
+| llvmpipe | Mesa software / CPU renderer | Present as expected |
+
+The V620 was reported as a **discrete GPU** using the `radv` driver, confirming that the open-source Mesa Vulkan stack can address the accelerator directly.
+
+This is important for the project because **llama.cpp can use Vulkan as the initial AMD inference backend**, allowing useful AI testing before deciding whether ROCm support is necessary or beneficial for this specific card.
+
+`vulkaninfo` also emitted display-plane warnings for a selected physical device. These are not being treated as a compute failure: the V620 is a headless accelerator with no display output in this configuration, while Vulkan still enumerated the device correctly through RADV.
+
+No unique Vulkan device UUIDs or raw terminal screenshots are being published in the public documentation.
 
 ## Current Result
 
@@ -152,25 +170,27 @@ This is the exact target for Slot 2 and confirms that the manually configured Ge
 | Idle GPU power telemetry | **PASS — ~7 W** |
 | V620 endpoint link | **PASS — 16GT/s x16** |
 | Z6 host-facing PCIe link | **PASS — 8GT/s / Gen3 x16** |
+| V620 available through Vulkan / RADV | **PASS** |
+| Actual AI compute workload | Pending |
 | Sustained load thermal test | Pending |
 
 ## Next Validation Steps
 
-The hardware-level checks for one V620 are now substantially complete. Next:
+The first V620 is now ready for an actual AI workload test:
 
-1. Install Vulkan tooling.
-2. Confirm the V620 appears as a Vulkan-capable device.
-3. Run a simple single-GPU Vulkan / compute workload.
-4. Monitor `sensors` during the workload.
-5. Record load edge, junction, memory temperature, and power draw.
-6. If the single-card cooling test passes, introduce the second V620 and repeat enumeration, BAR, link, and thermal checks.
+1. Build `llama.cpp` with the Vulkan backend enabled.
+2. Confirm `llama.cpp` lists the V620 as a usable Vulkan device.
+3. Run a small GGUF model entirely on the V620.
+4. Monitor `sensors` during inference.
+5. Record model, quantization, load time, tokens/second, VRAM utilization, GPU power, edge temperature, junction temperature, and memory temperature.
+6. If the single-card AI workload and cooling test pass, introduce the second V620 and repeat PCIe / BAR / Vulkan validation before multi-GPU inference testing.
 
 ## Security / Documentation Note
 
-The raw terminal photographs used for this validation are not being published directly because the shell prompt contains local username / hostname information. The public repository records only the technical fields necessary to demonstrate successful hardware initialization.
+The raw terminal photographs used for validation are not being published directly because the shell prompt contains local username / hostname information and Vulkan output contains device-specific identifiers. The public repository records only the technical fields necessary to demonstrate successful hardware initialization.
 
 ## Engineering Takeaway
 
-The first V620 is now validated at the hardware / kernel level: Ubuntu recognizes it, `amdgpu` binds correctly, the expected VRAM is initialized, a full 32GB PCIe BAR is allocated, the Z6 host connection negotiates correctly at PCIe Gen3 x16, and healthy idle telemetry is available.
+The first V620 is now validated from firmware through the graphics-compute API layer: Ubuntu recognizes it, `amdgpu` binds correctly, the expected VRAM is initialized, a full 32GB PCIe BAR is allocated, the Z6 host connection negotiates correctly at PCIe Gen3 x16, healthy idle telemetry is available, and Mesa RADV exposes the card as a Vulkan-capable discrete GPU.
 
-This creates a strong single-GPU baseline before software acceleration testing and before introducing the second 32GB accelerator.
+This creates a strong single-GPU baseline before the first real AI inference benchmark and before introducing the second 32GB accelerator.
