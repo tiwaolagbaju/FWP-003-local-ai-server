@@ -55,15 +55,21 @@ RAM width 256bits GDDR6
 30704M of VRAM memory ready
 ```
 
+Verbose PCIe output independently confirmed the large memory window:
+
+```text
+Region 0: Memory ... (64-bit, prefetchable) [size=32G]
+Region 2: Memory ... (64-bit, prefetchable) [size=2M]
+Region 5: Memory ... (32-bit, non-prefetchable) [size=1M]
+```
+
 Interpretation:
 
 - The physical card is the expected 32GB V620.
-- Approximately **30.0 GiB / 30,704 MiB is exposed as usable VRAM** after firmware / driver reservations.
-- The PCIe memory BAR is reported as **32,768 MiB (32GB)**.
+- Approximately **30,704 MiB is exposed as usable VRAM** after firmware / driver reservations.
+- The primary GPU PCIe memory region is a full **32GB prefetchable BAR**.
 
-The full 32GB BAR allocation is strong evidence that the large-BAR / Resizable BAR configuration is functioning as intended for this card.
-
-The difference between the advertised 32GB and the ~30,704 MiB usable value is not being treated as missing memory; part of the physical VRAM address space is reserved for GPU firmware and driver operation.
+Because Slot 2 Resizable BAR was enabled in BIOS and Linux is receiving a full 32GB BAR instead of a legacy small aperture, the large-BAR / Resizable-BAR configuration is considered **validated for the first V620**.
 
 ## Additional Driver Initialization Results
 
@@ -101,22 +107,32 @@ These are healthy idle temperatures for the modified passive V620 cooling setup.
 
 These readings validate only the **idle state**. The fan shroud and airflow design will not be considered fully validated until temperatures are monitored under sustained GPU compute load.
 
-## PCIe Endpoint Link Observation
+## PCIe Link Validation
 
-Verbose PCIe inspection of the **V620 GPU endpoint** at `23:00.0` reported:
+The V620 GPU endpoint at `23:00.0` reported:
 
 ```text
 LnkCap: Speed 16GT/s, Width x16
 LnkSta: Speed 16GT/s, Width x16
 ```
 
-This corresponds to a PCIe 4.0 x16-capable link and shows that the endpoint-to-switch connection is operating at its full advertised width and speed.
+This is the internal connection between the V620's onboard PCIe switch and the Navi 21 GPU endpoint.
 
-However, the V620 contains an onboard PCIe switch. Because the Z6 G4 host slot itself is a PCIe Gen3 platform, the `23:00.0` reading should **not** be interpreted as proof that the workstation slot is operating at PCIe Gen4.
+The switch's **upstream / host-facing port** at `21:00.0` reported:
 
-The host-facing link still needs to be checked on the switch's **upstream port** (`21:00.0`). The expected host-side result is Gen3 / 8GT/s at x16 if Slot 2 is negotiating correctly with the Z6.
+```text
+LnkCap: Speed 16GT/s, Width x16
+LnkSta: Speed 8GT/s (downgraded), Width x16
+```
 
-This distinction is intentionally documented so the final project does not overstate the platform's PCIe capability.
+This confirms the actual workstation-to-card connection is:
+
+- **PCIe Gen3** — 8 GT/s
+- **x16 link width**
+
+The word `downgraded` is expected here. The V620's onboard switch supports PCIe Gen4, while the HP Z6 G4 host platform provides PCIe Gen3. The link therefore negotiates down to the fastest common generation while retaining the full x16 width.
+
+This is the exact target for Slot 2 and confirms that the manually configured Gen3 limit is functioning correctly.
 
 ## Current Result
 
@@ -129,26 +145,25 @@ This distinction is intentionally documented so the final project does not overs
 | V620 identified as Navi 21 / Radeon Pro V620 | **PASS** |
 | `amdgpu` driver bound | **PASS** |
 | Usable VRAM initialized | **PASS — ~30,704 MiB** |
-| 32GB PCIe BAR allocated | **PASS — 32,768 MiB** |
-| Resizable BAR / large BAR behavior | **Strong initial PASS** |
+| 32GB PCIe BAR allocated | **PASS — 32GB** |
+| Resizable BAR / large BAR behavior | **PASS** |
 | V620 temperature telemetry visible | **PASS** |
 | Idle thermals | **PASS — edge 43°C / junction 45°C / memory 42°C** |
 | Idle GPU power telemetry | **PASS — ~7 W** |
 | V620 endpoint link | **PASS — 16GT/s x16** |
-| Z6 host-facing PCIe Gen3 link | Pending upstream-port check |
+| Z6 host-facing PCIe link | **PASS — 8GT/s / Gen3 x16** |
 | Sustained load thermal test | Pending |
 
 ## Next Validation Steps
 
-Before installing ROCm or a full AI stack:
+The hardware-level checks for one V620 are now substantially complete. Next:
 
-1. Inspect the V620 switch upstream port at `21:00.0` to verify the **host-facing** link is Gen3 x16.
-2. Confirm the 32GB memory region directly in verbose PCIe output.
-3. Install Vulkan tooling.
-4. Confirm the V620 appears as a Vulkan-capable device.
-5. Run a simple single-GPU compute / inference workload while monitoring `sensors`.
-6. Record load temperature, junction temperature, memory temperature, and power draw.
-7. Only after the single-card cooling and compute tests pass, introduce the second V620.
+1. Install Vulkan tooling.
+2. Confirm the V620 appears as a Vulkan-capable device.
+3. Run a simple single-GPU Vulkan / compute workload.
+4. Monitor `sensors` during the workload.
+5. Record load edge, junction, memory temperature, and power draw.
+6. If the single-card cooling test passes, introduce the second V620 and repeat enumeration, BAR, link, and thermal checks.
 
 ## Security / Documentation Note
 
@@ -156,6 +171,6 @@ The raw terminal photographs used for this validation are not being published di
 
 ## Engineering Takeaway
 
-The first V620 has progressed beyond simple POST detection: Ubuntu recognizes it by model, the kernel binds the correct AMD driver, the expected GDDR6 memory is initialized, the system allocates a full 32GB PCIe BAR, hardware telemetry is accessible from Linux, and the GPU endpoint link itself is healthy at x16.
+The first V620 is now validated at the hardware / kernel level: Ubuntu recognizes it, `amdgpu` binds correctly, the expected VRAM is initialized, a full 32GB PCIe BAR is allocated, the Z6 host connection negotiates correctly at PCIe Gen3 x16, and healthy idle telemetry is available.
 
-The remaining PCIe question is specifically the Z6-to-card host link, which is being verified independently because the V620's onboard PCIe switch can otherwise make the endpoint speed easy to misinterpret.
+This creates a strong single-GPU baseline before software acceleration testing and before introducing the second 32GB accelerator.
