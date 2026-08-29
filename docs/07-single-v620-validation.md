@@ -4,7 +4,7 @@
 
 The HP Z6 G4 successfully completed POST and booted Ubuntu 26.04.1 LTS with the first AMD Radeon Pro V620 installed in the planned Slot 2 position.
 
-Linux then successfully enumerated the V620, bound it to the in-kernel `amdgpu` driver, initialized the GPU, and exposed a full 32GB PCIe BAR for the card.
+Linux then successfully enumerated the V620, bound it to the in-kernel `amdgpu` driver, initialized the GPU, exposed a full 32GB PCIe BAR for the card, and provided working thermal / power telemetry through `lm-sensors`.
 
 This is the first successful accelerator-integration checkpoint and confirms that one V620 can coexist with the NVIDIA RTX 3050 display GPU using the current BIOS configuration.
 
@@ -82,6 +82,27 @@ A message stating that the driver could not find a CRTC / display size was obser
 
 An early VBIOS / ROM alignment warning was also observed. Because the driver subsequently fetched the VBIOS, initialized the GPU, exposed the expected VRAM/BAR sizes, and completed DRM registration, it is being documented for awareness rather than treated as a failure at this checkpoint.
 
+## Thermal and Power Telemetry
+
+`lm-sensors` successfully exposed the first V620 as an `amdgpu` hwmon device.
+
+Idle readings observed during validation:
+
+| Sensor | Idle Reading |
+|---|---:|
+| GPU edge | **43°C** |
+| GPU junction / hotspot | **45°C** |
+| Memory | **42°C** |
+| GPU power (PPT) | **~7 W** |
+| Reported power cap | **250 W** |
+| Memory clock | **~96 MHz** |
+
+These are healthy idle temperatures for the modified passive V620 cooling setup. The small difference between edge and junction temperature also indicates that the card is not showing an obvious localized hotspot at idle.
+
+These readings validate only the **idle state**. The fan shroud and airflow design will not be considered fully validated until temperatures are monitored under sustained GPU compute load.
+
+The initial attempt to read `/sys/class/drm/.../temp1_input` manually was malformed at the shell prompt and produced command errors. Installing `lm-sensors` provided a cleaner and more reliable way to read the AMD GPU's exposed hwmon telemetry, so `sensors` will be used as the primary thermal-validation tool for this phase.
+
 ## Current Result
 
 | Check | Result |
@@ -95,20 +116,23 @@ An early VBIOS / ROM alignment warning was also observed. Because the driver sub
 | Usable VRAM initialized | **PASS — ~30,704 MiB** |
 | 32GB PCIe BAR allocated | **PASS — 32,768 MiB** |
 | Resizable BAR / large BAR behavior | **Strong initial PASS; final validation pending PCIe inspection** |
+| V620 temperature telemetry visible | **PASS** |
+| Idle thermals | **PASS — edge 43°C / junction 45°C / memory 42°C** |
+| Idle GPU power telemetry | **PASS — ~7 W** |
 | PCIe Gen3 link validated | Pending |
-| V620 temperature visible | Pending |
-| Sustained load test | Pending |
+| Sustained load thermal test | Pending |
 
 ## Next Validation Steps
 
-Before installing ROCm or AI software:
+Before installing ROCm or a full AI stack:
 
 1. Inspect PCIe link capability, negotiated generation, and link width.
 2. Inspect the Resizable BAR capability directly with verbose PCIe information.
-3. Establish idle GPU temperature monitoring.
-4. Check the kernel log specifically for fatal `amdgpu` / PCIe errors.
-5. Install Vulkan tooling only after hardware-level validation is complete.
-6. Run a simple single-GPU compute test before introducing the second V620.
+3. Install Vulkan tooling.
+4. Confirm the V620 appears as a Vulkan-capable device.
+5. Run a simple single-GPU compute / inference workload while monitoring `sensors`.
+6. Record load temperature, junction temperature, memory temperature, and power draw.
+7. Only after the single-card cooling and compute tests pass, introduce the second V620.
 
 ## Security / Documentation Note
 
@@ -116,6 +140,6 @@ The raw terminal photographs used for this validation are not being published di
 
 ## Engineering Takeaway
 
-The first V620 has progressed beyond simple POST detection: Ubuntu recognizes it by model, the kernel binds the correct AMD driver, the expected GDDR6 memory is initialized, and the system allocates a full 32GB PCIe BAR.
+The first V620 has progressed beyond simple POST detection: Ubuntu recognizes it by model, the kernel binds the correct AMD driver, the expected GDDR6 memory is initialized, the system allocates a full 32GB PCIe BAR, and hardware telemetry is accessible from Linux.
 
-This is an important portfolio checkpoint because it demonstrates staged PCIe accelerator integration, Linux driver validation, firmware log interpretation, and large-memory GPU resource verification before any AI framework is installed.
+The card is also idling at healthy temperatures with the custom cooling approach, creating a strong baseline for the next stage: PCIe verification followed by controlled compute-load thermal testing.
