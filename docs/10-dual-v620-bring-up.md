@@ -30,8 +30,6 @@ B:20 D:0 F:0
 
 A PCIe Surprise Link Down event means firmware detected that an expected PCIe link disappeared unexpectedly. The literal `Slot 0` text is not assumed to correspond directly to a physical expansion-slot number; the bus/device/function address is the more useful diagnostic identifier.
 
-At this stage the exact device associated with `B:20 D:0 F:0` has not been mapped conclusively, so the error is not being assigned to a specific component without controlled testing.
-
 ## Isolation Sequence
 
 The configuration was progressively reduced to restore the previous known-good baseline.
@@ -60,8 +58,34 @@ Current configuration:
 Result:
 
 - **System booted successfully**
-- recurring 928 PCIe Surprise Link Down error did not prevent boot
-- previous single-V620 baseline has been restored
+- previous single-V620 baseline restored
+
+## Linux PCIe Enumeration After Recovery
+
+The restored baseline successfully enumerated both graphics devices and the V620's internal PCIe switch hierarchy:
+
+```text
+15:00.0 VGA compatible controller: NVIDIA GA107 [GeForce RTX 3050 6GB]
+15:00.1 Audio device: NVIDIA GA107 High Definition Audio Controller
+21:00.0 PCI bridge: AMD Navi 10 XL Upstream Port of PCI Express Switch
+22:00.0 PCI bridge: AMD Navi 10 XL Downstream Port of PCI Express Switch
+23:00.0 Display controller: AMD Navi 21 [Radeon Pro V620]
+```
+
+This confirms:
+
+- RTX 3050 is enumerating normally at `15:00.0`
+- V620 #1 is enumerating normally at `23:00.0`
+- the V620's onboard PCIe switch chain is present at `21:00.0` and `22:00.0`
+
+The earlier firmware error referenced `B:20 D:0 F:0`. Because the filtered enumeration starts the visible V620 switch hierarchy at bus 21, the device at `20:00.0` should be mapped directly under the working baseline before attributing the previous Surprise Link Down event to a specific card or slot.
+
+Recommended mapping commands:
+
+```bash
+lspci -s 20:00.0 -nnk
+lspci -t
+```
 
 ## Interpretation
 
@@ -81,32 +105,25 @@ Because the system returned to stable operation when the display GPU was restore
 | Check | Result |
 |---|---|
 | Original temporary/test RAM at 32GB | **PASS / current** |
-| RTX 3050 in Slot 4 | **PASS / known-good** |
-| V620 #1 in Slot 2 | **PASS / known-good baseline** |
+| RTX 3050 in Slot 4 | **PASS / enumerated at 15:00.0** |
+| V620 #1 in Slot 2 | **PASS / enumerated at 23:00.0** |
+| V620 onboard PCIe switch | **PASS / 21:00.0 → 22:00.0 → 23:00.0 chain visible** |
 | V620 #2 removed | PASS — isolated |
 | Second SSD removed | PASS — isolated |
 | POST 517 | Not present with current 32GB configuration |
-| 928 PCIe Surprise Link Down | **Cleared sufficiently for successful boot after RTX returned to Slot 4** |
-| Second SSD identified as primary cause | No |
-| RTX 3050 / Slot 1 configuration | **Primary suspect from current evidence** |
+| 928 PCIe Surprise Link Down | **Not preventing current successful boot** |
+| Previous error BDF | `20:00.0` |
+| Current device at 20:00.0 mapped | Pending direct `lspci` query |
+| RTX 3050 / Slot 1 configuration | Primary suspect from current evidence |
 | Single-V620 baseline restored | **PASS** |
-| Dual-V620 testing | Paused pending next controlled step |
+| Dual-V620 testing | Paused pending fault mapping / cooling readiness |
 
 ## Recommended Next Step
 
-Do not immediately rebuild the full three-GPU configuration.
+Before reintroducing any hardware, map `20:00.0` under the known-good baseline and inspect the PCIe tree. Then confirm `amdgpu` binding, temperatures, and absence of new PCIe/AER errors.
 
-First verify the restored baseline in Linux, including:
-
-- RTX 3050 enumeration
-- V620 #1 enumeration and `amdgpu` binding
-- V620 temperature / power telemetry
-- absence of new PCIe/AER errors
-
-Once the baseline is confirmed stable, reintroduce **one component at a time**. The second M.2 SSD can be re-tested independently before attempting V620 #2 again.
-
-The final placement of the display-only RTX 3050 should be reconsidered if Slot 1 repeatedly reproduces the 928 error.
+Once the baseline is fully characterized, reintroduce one component at a time. The final placement of the display-only RTX 3050 should be reconsidered if Slot 1 repeatedly reproduces the 928 error.
 
 ## Engineering Takeaway
 
-Returning the RTX 3050 to its previously proven Slot 4 position restored a successful boot after the second SSD had already been ruled out. This demonstrates the value of one-variable-at-a-time fault isolation and provides a clean baseline before any further dual-accelerator integration work.
+Returning the RTX 3050 to its previously proven Slot 4 position restored a successful boot, and Linux now confirms normal enumeration of the RTX 3050 and the complete V620 switch/GPU hierarchy. Mapping the firmware-reported `20:00.0` address against this working topology is the next high-value diagnostic step.
