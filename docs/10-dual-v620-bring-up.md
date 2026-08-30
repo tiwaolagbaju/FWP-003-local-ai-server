@@ -38,69 +38,57 @@ At this stage the exact device associated with `B:20 D:0 F:0` has not yet been m
 
 ## Current Isolation Configuration
 
-The system has now been reduced to:
+The system has been reduced to:
 
 - 32GB ECC Registered memory
 - RTX 3050 in Slot 1, display only
 - V620 #1 in Slot 2
 - V620 #2 removed
-- second M.2 SSD installed in the system's SSD0 position
+- second M.2 SSD removed
 
-This removes the previous >32GB memory-cooling warning and the second accelerator from the immediate test configuration.
+Removing the second SSD did **not** clear the 928 PCIe Surprise Link Down error, so the new SSD is no longer the leading suspect.
 
-## New PCIe Variable — Second M.2 SSD
+## New Primary Variable — RTX 3050 Relocation to Slot 1
 
-The second SSD is now considered a significant troubleshooting variable. On the Z6 G4, both native M.2 sockets are PCIe devices connected through CPU PCIe resources. A failing, poorly seated, or otherwise unstable NVMe device can therefore generate a PCIe Surprise Link Down event in the same general way as an expansion card.
+The RTX 3050 had previously operated successfully in Slot 4 before being relocated to Slot 1 for the dual-V620 layout.
 
-HP Z6 G4 field reports also document 928 Surprise Link Down events associated with M.2/NVMe changes, so the SSD should be isolated before concluding that the remaining V620 is faulty.
+HP documents Slot 1 as PCIe Gen3 x4, CPU-connected, with an open-ended connector that can physically accept a wider PCIe card. This means the RTX 3050 can fit there, but the relocation is still a meaningful topology change and must be isolated experimentally.
 
-The second M.2 device also changes PCIe resource allocation on the Z6 G4 by reducing Slot 4 from x8 to x4 electrical. The RTX 3050 is currently in Slot 1, so this particular lane-sharing behavior does not directly constrain the current display card, but it confirms that the second M.2 device is an active part of the workstation's PCIe topology.
-
-## Current Interpretation
-
-Possible causes now include:
-
-- the newly installed second M.2 SSD or its socket/seating
-- V620 #1 or its Slot 2 link
-- V620 auxiliary power instability
-- RTX 3050 after relocation to Slot 1
-- residual firmware/AER error state following the previous dual-GPU event
-- PCIe link / signal-integrity instability
-- thermal damage or instability from the earlier inadequate-airflow event
-
-The exact `B:20 D:0 F:0` device should not be inferred solely from the bus number because PCIe bus numbering can change with installed topology.
+A Z6 G4 field report documents a similar `PCIe Link Down` / `Slot 0` symptom after changing a consumer GPU, with slot/card isolation used as the troubleshooting path. Because the SSD has now been ruled out and the RTX relocation is one of the remaining changes from the previous stable state, Slot 1 / RTX 3050 is now a high-priority test variable.
 
 ## Corrective Action / Isolation Plan
 
 Use one-variable-at-a-time testing:
 
 1. Power down completely and disconnect AC.
-2. Keep the current 32GB memory configuration.
-3. Keep RTX 3050 in Slot 1 and V620 #1 in Slot 2 unchanged.
-4. Remove **only the newly added non-boot second SSD** from SSD0.
-5. Boot and observe whether 928 recurs.
-6. If 928 disappears, investigate the second SSD, its seating, firmware/health, and M.2 socket before reinstalling it.
-7. If 928 persists, restore the RTX 3050 to its previously proven display slot as the next single-variable test.
-8. If still present, isolate V620 #1 by reseating it and its known-good auxiliary power path, then if necessary test the workstation without the V620.
+2. Keep the 32GB memory configuration unchanged.
+3. Keep V620 #1 in Slot 2 unchanged.
+4. Keep V620 #2 removed.
+5. Keep the newly added second SSD removed.
+6. Move **only the RTX 3050 from Slot 1 back to its previously proven Slot 4 position**.
+7. Boot and observe whether 928 recurs.
+8. If 928 disappears, investigate the Slot 1 / RTX 3050 combination before using Slot 1 in the final layout.
+9. If 928 persists, the next isolation step is V620 #1 / Slot 2 / auxiliary power, including a boot with V620 #1 removed if necessary.
 
-Do not reintroduce V620 #2 until the current single-V620 baseline is again stable.
+Do not reintroduce the second SSD or V620 #2 until the current baseline is stable.
 
 ## Current Status
 
 | Check | Result |
 |---|---|
 | Memory restored to 32GB baseline | PASS |
-| RTX 3050 in Slot 1 | Current |
 | V620 #1 in Slot 2 | Current |
 | V620 #2 removed | PASS — isolated |
-| Second SSD installed in SSD0 | **New suspect / pending isolation** |
-| POST 517 in current 32GB config | Expected cleared |
-| Previous 928 PCIe Surprise Link Down | **FAIL / requires isolation** |
+| Second SSD removed | PASS — **928 still present; SSD not primary cause** |
+| RTX 3050 in Slot 1 | **Current high-priority suspect** |
+| RTX 3050 previously stable in Slot 4 | Historical known-good state |
+| POST 517 in current 32GB config | Cleared / no longer active variable |
+| 928 PCIe Surprise Link Down | **Still present** |
 | Error BDF | **B:20 D:0 F:0** |
 | Physical device mapped to BDF | Pending |
-| Single-V620 known-good baseline restored | Pending SSD isolation test |
+| Next test | Move RTX 3050 Slot 1 → Slot 4 only |
 | Dual-V620 testing | Paused |
 
 ## Engineering Takeaway
 
-The troubleshooting process is now focused on reproducing the last known-good single-V620 state one variable at a time. Because native NVMe storage is itself part of the PCIe fabric, the newly installed second SSD must be ruled out before assigning the 928 event to a GPU. This avoids replacing or condemning hardware based only on an ambiguous firmware slot label.
+The second M.2 SSD was isolated and the fault persisted, so troubleshooting has advanced to the next topology change: relocating the RTX 3050 from its previously stable Slot 4 position to Slot 1. Returning one device at a time to the known-good configuration provides stronger evidence than interpreting the ambiguous firmware `Slot 0` label.
