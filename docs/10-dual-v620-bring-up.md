@@ -28,7 +28,7 @@ PCIe Surprise Link Down error detected on Slot 0
 B:20 D:0 F:0
 ```
 
-A PCIe Surprise Link Down event means firmware detected that an expected PCIe link disappeared unexpectedly. The literal `Slot 0` text is not assumed to correspond directly to a physical expansion-slot number; the bus/device/function address is the more useful diagnostic identifier.
+A PCIe Surprise Link Down event means firmware detected that an expected PCIe link disappeared unexpectedly.
 
 ## Isolation Sequence
 
@@ -72,33 +72,69 @@ The restored baseline successfully enumerated both graphics devices and the V620
 23:00.0 Display controller: AMD Navi 21 [Radeon Pro V620]
 ```
 
-This confirms:
+The recovery boot's kernel log provides the missing mapping for the earlier 928 address:
 
-- RTX 3050 is enumerating normally at `15:00.0`
-- V620 #1 is enumerating normally at `23:00.0`
-- the V620's onboard PCIe switch chain is present at `21:00.0` and `22:00.0`
-
-The earlier firmware error referenced `B:20 D:0 F:0`. Because the filtered enumeration starts the visible V620 switch hierarchy at bus 21, the device at `20:00.0` should be mapped directly under the working baseline before attributing the previous Surprise Link Down event to a specific card or slot.
-
-Recommended mapping commands:
-
-```bash
-lspci -s 20:00.0 -nnk
-lspci -t
+```text
+20:00.0 Intel PCIe Root Port
+   -> 21:00.0 AMD V620 upstream switch
+      -> 22:00.0 AMD V620 downstream switch
+         -> 23:00.0 Radeon Pro V620
 ```
 
-## Interpretation
+The kernel also reports:
 
-This is strong evidence that the RTX 3050 relocation to Slot 1, or the PCIe topology created by that configuration, contributed to the 928 event.
+```text
+21:00.0: 126.016 Gb/s available PCIe bandwidth,
+limited by 8.0 GT/s PCIe x16 link at 20:00.0
+```
 
-It does **not yet prove** Slot 1 is defective. Possible explanations include:
+Therefore the firmware-reported `B:20 D:0 F:0` address maps to the **host-side Intel PCIe root port feeding V620 #1 in Slot 2**.
 
-- RTX 3050 / Slot 1 compatibility or link-training behavior
-- physical seating or mechanical fit in Slot 1
-- a topology/resource interaction introduced by the three-card layout
-- a transient error generated during the earlier hot dual-V620 attempt
+This materially changes the fault interpretation: the earlier 928 event indicates that the Slot 2 / V620 #1 PCIe path experienced a Surprise Link Down event. The error was not directly reporting the second SSD or RTX 3050 endpoint.
 
-Because the system returned to stable operation when the display GPU was restored to its previous Slot 4 location, Slot 4 is retained as the current known-good display-GPU position.
+## Recovery Boot Driver / BAR Validation
+
+On the current successful baseline boot, V620 #1 initializes correctly with `amdgpu`:
+
+- V620 endpoint: `23:00.0`
+- `amdgpu` kernel initialization completes successfully
+- MEM ECC active
+- RAS initialized
+- VRAM: **30704M**
+- BAR: **32768M**
+- GDDR6 / 256-bit memory interface
+- SMU initialized successfully
+- DRM initialized successfully
+
+The same expected non-critical messages remain present:
+
+- ROM / VBIOS alignment warning followed by successful VBIOS fetch
+- `Cannot find any crtc or sizes` because the V620 is not being used as the display GPU
+
+## Current PCIe Error State
+
+The recovery boot does **not** show a new Linux PCIe AER fatal, Surprise Link Down, or equivalent V620 link failure.
+
+The kernel notes that the HP firmware does not expose OS control of AER on several root complexes:
+
+```text
+platform does not support ... AER ...
+```
+
+This means firmware-level PCIe diagnostics remain important on this workstation and the absence of Linux AER reporting should not be treated as proof that a prior firmware-level event did not occur.
+
+Several ACPI/WMI firmware errors also appear later in boot. These are logged separately from the V620 PCIe path and are not currently being treated as evidence of a GPU link failure because the V620 subsequently initializes normally.
+
+## Revised Interpretation
+
+Current evidence supports the following:
+
+1. The **928 BDF directly maps to the root port feeding V620 #1**.
+2. V620 #1 and its PCIe path are currently functioning normally in the restored baseline.
+3. The newly installed second SSD was not the primary cause because removing it did not clear the recurring 928 state.
+4. Moving the RTX 3050 back to Slot 4 coincided with recovery, but this does **not** mean the 928 directly originated from the RTX; the actual failing link reported by firmware was the V620 #1 root-port path.
+5. The earlier dual-GPU attempt involved inadequate passive-GPU cooling and a prolonged firmware halt, so transient thermal or power instability remains a plausible contributor.
+6. A topology/resource interaction created by the RTX-in-Slot-1 / dual-V620 configuration also remains possible.
 
 ## Current Status
 
@@ -107,23 +143,35 @@ Because the system returned to stable operation when the display GPU was restore
 | Original temporary/test RAM at 32GB | **PASS / current** |
 | RTX 3050 in Slot 4 | **PASS / enumerated at 15:00.0** |
 | V620 #1 in Slot 2 | **PASS / enumerated at 23:00.0** |
-| V620 onboard PCIe switch | **PASS / 21:00.0 → 22:00.0 → 23:00.0 chain visible** |
+| V620 host root port | **20:00.0 — mapped** |
+| V620 onboard PCIe switch | **PASS / 21:00.0 → 22:00.0 → 23:00.0** |
+| V620 host-facing link | **PCIe Gen3 x16 / 8.0 GT/s x16** |
+| V620 usable VRAM | **30704M** |
+| V620 BAR | **32768M** |
 | V620 #2 removed | PASS — isolated |
 | Second SSD removed | PASS — isolated |
 | POST 517 | Not present with current 32GB configuration |
-| 928 PCIe Surprise Link Down | **Not preventing current successful boot** |
-| Previous error BDF | `20:00.0` |
-| Current device at 20:00.0 mapped | Pending direct `lspci` query |
-| RTX 3050 / Slot 1 configuration | Primary suspect from current evidence |
+| Previous 928 BDF | **20:00.0 = root port feeding V620 #1** |
+| New Linux fatal PCIe/AER error on recovery boot | **Not observed** |
 | Single-V620 baseline restored | **PASS** |
-| Dual-V620 testing | Paused pending fault mapping / cooling readiness |
+| Dual-V620 testing | Paused pending cooling / controlled reintroduction |
 
 ## Recommended Next Step
 
-Before reintroducing any hardware, map `20:00.0` under the known-good baseline and inspect the PCIe tree. Then confirm `amdgpu` binding, temperatures, and absence of new PCIe/AER errors.
+Do not immediately reinstall V620 #2.
 
-Once the baseline is fully characterized, reintroduce one component at a time. The final placement of the display-only RTX 3050 should be reconsidered if Slot 1 repeatedly reproduces the 928 error.
+First characterize the restored single-V620 baseline for stability without sustained AI load:
+
+```bash
+sensors
+lspci -vv -s 20:00.0
+lspci -vv -s 21:00.0
+```
+
+Then perform several normal cold boots / reboots with the same hardware configuration and confirm that POST 928 does not recur.
+
+If the baseline remains stable, reintroduce one component at a time. The second SSD can be re-tested independently before V620 #2. Dual-V620 testing should wait until both passive cards have proper directed airflow.
 
 ## Engineering Takeaway
 
-Returning the RTX 3050 to its previously proven Slot 4 position restored a successful boot, and Linux now confirms normal enumeration of the RTX 3050 and the complete V620 switch/GPU hierarchy. Mapping the firmware-reported `20:00.0` address against this working topology is the next high-value diagnostic step.
+The firmware's ambiguous `Slot 0` label was resolved by mapping its B:D:F address under Linux. `20:00.0` is the Intel root port directly feeding the Slot 2 V620 switch chain. The V620 path currently operates normally after returning the workstation to the known-good baseline, which points toward a transient thermal/power/topology event rather than a confirmed failed GPU.
