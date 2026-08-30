@@ -72,7 +72,7 @@ The restored baseline successfully enumerated both graphics devices and the V620
 23:00.0 Display controller: AMD Navi 21 [Radeon Pro V620]
 ```
 
-The recovery boot's kernel log provides the missing mapping for the earlier 928 address:
+The recovery boot's kernel log provides the mapping for the earlier 928 address:
 
 ```text
 20:00.0 Intel PCIe Root Port
@@ -81,16 +81,9 @@ The recovery boot's kernel log provides the missing mapping for the earlier 928 
          -> 23:00.0 Radeon Pro V620
 ```
 
-The kernel also reports:
+The kernel reports that the V620 host-facing path is limited by the workstation to PCIe Gen3 x16, which is the expected platform behavior.
 
-```text
-21:00.0: 126.016 Gb/s available PCIe bandwidth,
-limited by 8.0 GT/s PCIe x16 link at 20:00.0
-```
-
-Therefore the firmware-reported `B:20 D:0 F:0` address maps to the **host-side Intel PCIe root port feeding V620 #1 in Slot 2**.
-
-This materially changes the fault interpretation: the earlier 928 event indicates that the Slot 2 / V620 #1 PCIe path experienced a Surprise Link Down event. The error was not directly reporting the second SSD or RTX 3050 endpoint.
+Therefore the firmware-reported `B:20 D:0 F:0` address maps to the **host-side Intel PCIe root port feeding V620 #1 in physical Slot 2**.
 
 ## Recovery Boot Driver / BAR Validation
 
@@ -111,17 +104,48 @@ The same expected non-critical messages remain present:
 - ROM / VBIOS alignment warning followed by successful VBIOS fetch
 - `Cannot find any crtc or sizes` because the V620 is not being used as the display GPU
 
+## Idle Thermal Validation After Recovery
+
+`sensors` on the restored single-V620 baseline reports:
+
+- V620 edge: **38 C**
+- V620 junction: **40 C**
+- V620 memory: **36 C**
+- V620 board power: **~7 W idle**
+- V620 power cap reported by sensor: **250 W**
+- CPU package: **~33 C**
+- OS NVMe composite: **~35 C**
+- chipset / PCH: **~50 C**
+
+These are healthy idle values and provide no indication that V620 #1 is currently in a thermal-fault state.
+
+This remains an **idle-only** validation. Sustained V620 compute testing remains deferred until the final directed-airflow hardware is installed.
+
+## Direct PCIe Bridge Validation
+
+Direct inspection of `20:00.0` confirms:
+
+- device: Intel Skylake-E PCI Express Root Port A
+- **Physical Slot: 2**
+- secondary bus: 21
+- subordinate bus: 23
+- **32GB prefetchable memory window** allocated behind the bridge
+- kernel driver: `pcieport`
+
+Direct inspection of `21:00.0` confirms:
+
+- AMD Navi 10 XL upstream switch port
+- downstream buses 22–23
+- the same **32GB prefetchable memory window** propagated through the V620 switch hierarchy
+- kernel driver: `pcieport`
+
+The initial non-root `lspci -vv` commands showed `Capabilities: <access denied>`. This is a permissions limitation, not a PCIe fault. A root-level query can be used if detailed link capability/status registers are needed.
+
 ## Current PCIe Error State
 
 The recovery boot does **not** show a new Linux PCIe AER fatal, Surprise Link Down, or equivalent V620 link failure.
 
-The kernel notes that the HP firmware does not expose OS control of AER on several root complexes:
-
-```text
-platform does not support ... AER ...
-```
-
-This means firmware-level PCIe diagnostics remain important on this workstation and the absence of Linux AER reporting should not be treated as proof that a prior firmware-level event did not occur.
+The kernel notes that the HP firmware does not expose OS control of AER on several root complexes, so firmware-level PCIe diagnostics remain important on this workstation.
 
 Several ACPI/WMI firmware errors also appear later in boot. These are logged separately from the V620 PCIe path and are not currently being treated as evidence of a GPU link failure because the V620 subsequently initializes normally.
 
@@ -129,12 +153,13 @@ Several ACPI/WMI firmware errors also appear later in boot. These are logged sep
 
 Current evidence supports the following:
 
-1. The **928 BDF directly maps to the root port feeding V620 #1**.
+1. The **928 BDF directly maps to the root port feeding V620 #1 in physical Slot 2**.
 2. V620 #1 and its PCIe path are currently functioning normally in the restored baseline.
-3. The newly installed second SSD was not the primary cause because removing it did not clear the recurring 928 state.
-4. Moving the RTX 3050 back to Slot 4 coincided with recovery, but this does **not** mean the 928 directly originated from the RTX; the actual failing link reported by firmware was the V620 #1 root-port path.
-5. The earlier dual-GPU attempt involved inadequate passive-GPU cooling and a prolonged firmware halt, so transient thermal or power instability remains a plausible contributor.
-6. A topology/resource interaction created by the RTX-in-Slot-1 / dual-V620 configuration also remains possible.
+3. Current V620 idle thermals are healthy.
+4. The newly installed second SSD was not the primary cause because removing it did not clear the recurring 928 state.
+5. Moving the RTX 3050 back to Slot 4 coincided with recovery, but this does **not** mean the 928 directly originated from the RTX; the reported failing link was the V620 #1 root-port path.
+6. The earlier dual-GPU attempt involved inadequate passive-GPU cooling and a prolonged firmware halt, so transient thermal or power instability remains a plausible contributor.
+7. A topology/resource interaction created by the RTX-in-Slot-1 / dual-V620 configuration also remains possible.
 
 ## Current Status
 
@@ -143,11 +168,13 @@ Current evidence supports the following:
 | Original temporary/test RAM at 32GB | **PASS / current** |
 | RTX 3050 in Slot 4 | **PASS / enumerated at 15:00.0** |
 | V620 #1 in Slot 2 | **PASS / enumerated at 23:00.0** |
-| V620 host root port | **20:00.0 — mapped** |
+| V620 host root port | **20:00.0 / Physical Slot 2 — mapped** |
 | V620 onboard PCIe switch | **PASS / 21:00.0 → 22:00.0 → 23:00.0** |
-| V620 host-facing link | **PCIe Gen3 x16 / 8.0 GT/s x16** |
+| V620 host-facing link | **PCIe Gen3 x16** |
 | V620 usable VRAM | **30704M** |
-| V620 BAR | **32768M** |
+| V620 BAR / bridge aperture | **32768M / 32GB** |
+| V620 idle edge / junction / memory | **38 C / 40 C / 36 C** |
+| V620 idle board power | **~7 W** |
 | V620 #2 removed | PASS — isolated |
 | Second SSD removed | PASS — isolated |
 | POST 517 | Not present with current 32GB configuration |
@@ -158,20 +185,12 @@ Current evidence supports the following:
 
 ## Recommended Next Step
 
-Do not immediately reinstall V620 #2.
+Keep the present hardware configuration unchanged and perform several normal cold boots / reboots. Confirm that POST 928 does not recur.
 
-First characterize the restored single-V620 baseline for stability without sustained AI load:
+If the baseline remains stable across repeated boots, reintroduce the second SSD as the next single variable and verify a clean boot again. Only after storage is independently validated should V620 #2 be reconsidered.
 
-```bash
-sensors
-lspci -vv -s 20:00.0
-lspci -vv -s 21:00.0
-```
-
-Then perform several normal cold boots / reboots with the same hardware configuration and confirm that POST 928 does not recur.
-
-If the baseline remains stable, reintroduce one component at a time. The second SSD can be re-tested independently before V620 #2. Dual-V620 testing should wait until both passive cards have proper directed airflow.
+Dual-V620 sustained testing remains deferred until both passive cards have proper directed airflow.
 
 ## Engineering Takeaway
 
-The firmware's ambiguous `Slot 0` label was resolved by mapping its B:D:F address under Linux. `20:00.0` is the Intel root port directly feeding the Slot 2 V620 switch chain. The V620 path currently operates normally after returning the workstation to the known-good baseline, which points toward a transient thermal/power/topology event rather than a confirmed failed GPU.
+The restored baseline now passes enumeration, driver initialization, BAR allocation, PCIe bridge mapping, and idle thermal checks. The original 928 address is confirmed as the Intel root port for physical Slot 2, but that link is currently stable. This points toward a transient thermal/power/topology event during the earlier dual-GPU configuration rather than a confirmed failed V620.
