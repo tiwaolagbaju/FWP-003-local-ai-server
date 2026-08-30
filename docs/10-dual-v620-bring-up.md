@@ -4,11 +4,7 @@
 
 Integrate the second AMD Radeon Pro V620 in Slot 5 while preserving a controlled, reversible validation process.
 
-Planned layout:
-
-- Slot 1: NVIDIA RTX 3050 (display only)
-- Slot 2: Radeon Pro V620 #1
-- Slot 5: Radeon Pro V620 #2
+Planned final compute layout remains under review after PCIe fault isolation.
 
 ## First Dual-GPU Boot Attempt
 
@@ -34,61 +30,83 @@ B:20 D:0 F:0
 
 A PCIe Surprise Link Down event means firmware detected that an expected PCIe link disappeared unexpectedly. The literal `Slot 0` text is not assumed to correspond directly to a physical expansion-slot number; the bus/device/function address is the more useful diagnostic identifier.
 
-At this stage the exact device associated with `B:20 D:0 F:0` has not yet been mapped under a known-good Linux boot, so the error is not being assigned to a specific V620, RTX 3050, or M.2 SSD without additional evidence.
+At this stage the exact device associated with `B:20 D:0 F:0` has not been mapped conclusively, so the error is not being assigned to a specific component without controlled testing.
 
-## Current Isolation Configuration
+## Isolation Sequence
 
-The system has been reduced to:
+The configuration was progressively reduced to restore the previous known-good baseline.
 
-- 32GB ECC Registered memory
-- RTX 3050 in Slot 1, display only
-- V620 #1 in Slot 2
-- V620 #2 removed
-- second M.2 SSD removed
+### Second SSD removed
 
-Removing the second SSD did **not** clear the 928 PCIe Surprise Link Down error, so the new SSD is no longer the leading suspect.
+The newly installed second M.2 SSD was removed while keeping the RTX 3050 in Slot 1 and V620 #1 in Slot 2.
 
-## New Primary Variable — RTX 3050 Relocation to Slot 1
+Result:
 
-The RTX 3050 had previously operated successfully in Slot 4 before being relocated to Slot 1 for the dual-V620 layout.
+- **928 error remained**
+- second SSD was therefore not the primary cause of the recurring fault
 
-HP documents Slot 1 as PCIe Gen3 x4, CPU-connected, with an open-ended connector that can physically accept a wider PCIe card. This means the RTX 3050 can fit there, but the relocation is still a meaningful topology change and must be isolated experimentally.
+### RTX 3050 returned to Slot 4
 
-A Z6 G4 field report documents a similar `PCIe Link Down` / `Slot 0` symptom after changing a consumer GPU, with slot/card isolation used as the troubleshooting path. Because the SSD has now been ruled out and the RTX relocation is one of the remaining changes from the previous stable state, Slot 1 / RTX 3050 is now a high-priority test variable.
+The RTX 3050 was then moved from Slot 1 back to its previously proven Slot 4 position while all other isolation variables remained unchanged.
 
-## Corrective Action / Isolation Plan
+Current configuration:
 
-Use one-variable-at-a-time testing:
+- 32GB of the original temporary/test ECC Registered RAM
+- RTX 3050 in **Slot 4**
+- Radeon Pro V620 #1 in **Slot 2**
+- Radeon Pro V620 #2 **removed**
+- second M.2 SSD **removed**
 
-1. Power down completely and disconnect AC.
-2. Keep the 32GB memory configuration unchanged.
-3. Keep V620 #1 in Slot 2 unchanged.
-4. Keep V620 #2 removed.
-5. Keep the newly added second SSD removed.
-6. Move **only the RTX 3050 from Slot 1 back to its previously proven Slot 4 position**.
-7. Boot and observe whether 928 recurs.
-8. If 928 disappears, investigate the Slot 1 / RTX 3050 combination before using Slot 1 in the final layout.
-9. If 928 persists, the next isolation step is V620 #1 / Slot 2 / auxiliary power, including a boot with V620 #1 removed if necessary.
+Result:
 
-Do not reintroduce the second SSD or V620 #2 until the current baseline is stable.
+- **System booted successfully**
+- recurring 928 PCIe Surprise Link Down error did not prevent boot
+- previous single-V620 baseline has been restored
+
+## Interpretation
+
+This is strong evidence that the RTX 3050 relocation to Slot 1, or the PCIe topology created by that configuration, contributed to the 928 event.
+
+It does **not yet prove** Slot 1 is defective. Possible explanations include:
+
+- RTX 3050 / Slot 1 compatibility or link-training behavior
+- physical seating or mechanical fit in Slot 1
+- a topology/resource interaction introduced by the three-card layout
+- a transient error generated during the earlier hot dual-V620 attempt
+
+Because the system returned to stable operation when the display GPU was restored to its previous Slot 4 location, Slot 4 is retained as the current known-good display-GPU position.
 
 ## Current Status
 
 | Check | Result |
 |---|---|
-| Memory restored to 32GB baseline | PASS |
-| V620 #1 in Slot 2 | Current |
+| Original temporary/test RAM at 32GB | **PASS / current** |
+| RTX 3050 in Slot 4 | **PASS / known-good** |
+| V620 #1 in Slot 2 | **PASS / known-good baseline** |
 | V620 #2 removed | PASS — isolated |
-| Second SSD removed | PASS — **928 still present; SSD not primary cause** |
-| RTX 3050 in Slot 1 | **Current high-priority suspect** |
-| RTX 3050 previously stable in Slot 4 | Historical known-good state |
-| POST 517 in current 32GB config | Cleared / no longer active variable |
-| 928 PCIe Surprise Link Down | **Still present** |
-| Error BDF | **B:20 D:0 F:0** |
-| Physical device mapped to BDF | Pending |
-| Next test | Move RTX 3050 Slot 1 → Slot 4 only |
-| Dual-V620 testing | Paused |
+| Second SSD removed | PASS — isolated |
+| POST 517 | Not present with current 32GB configuration |
+| 928 PCIe Surprise Link Down | **Cleared sufficiently for successful boot after RTX returned to Slot 4** |
+| Second SSD identified as primary cause | No |
+| RTX 3050 / Slot 1 configuration | **Primary suspect from current evidence** |
+| Single-V620 baseline restored | **PASS** |
+| Dual-V620 testing | Paused pending next controlled step |
+
+## Recommended Next Step
+
+Do not immediately rebuild the full three-GPU configuration.
+
+First verify the restored baseline in Linux, including:
+
+- RTX 3050 enumeration
+- V620 #1 enumeration and `amdgpu` binding
+- V620 temperature / power telemetry
+- absence of new PCIe/AER errors
+
+Once the baseline is confirmed stable, reintroduce **one component at a time**. The second M.2 SSD can be re-tested independently before attempting V620 #2 again.
+
+The final placement of the display-only RTX 3050 should be reconsidered if Slot 1 repeatedly reproduces the 928 error.
 
 ## Engineering Takeaway
 
-The second M.2 SSD was isolated and the fault persisted, so troubleshooting has advanced to the next topology change: relocating the RTX 3050 from its previously stable Slot 4 position to Slot 1. Returning one device at a time to the known-good configuration provides stronger evidence than interpreting the ambiguous firmware `Slot 0` label.
+Returning the RTX 3050 to its previously proven Slot 4 position restored a successful boot after the second SSD had already been ruled out. This demonstrates the value of one-variable-at-a-time fault isolation and provides a clean baseline before any further dual-accelerator integration work.
