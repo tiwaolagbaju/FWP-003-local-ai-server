@@ -47,13 +47,13 @@ Result:
 
 The RTX 3050 was then moved from Slot 1 back to its previously proven Slot 4 position while all other isolation variables remained unchanged.
 
-Current configuration:
+Baseline configuration:
 
 - 32GB of the original temporary/test ECC Registered RAM
 - RTX 3050 in **Slot 4**
 - Radeon Pro V620 #1 in **Slot 2**
 - Radeon Pro V620 #2 **removed**
-- second M.2 SSD **removed**
+- second M.2 SSD initially **removed**
 
 Result:
 
@@ -87,7 +87,7 @@ Therefore the firmware-reported `B:20 D:0 F:0` address maps to the **host-side I
 
 ## Recovery Boot Driver / BAR Validation
 
-On the current successful baseline boot, V620 #1 initializes correctly with `amdgpu`:
+On the successful baseline boot, V620 #1 initializes correctly with `amdgpu`:
 
 - V620 endpoint: `23:00.0`
 - `amdgpu` kernel initialization completes successfully
@@ -139,15 +139,24 @@ Direct inspection of `21:00.0` confirms:
 - the same **32GB prefetchable memory window** propagated through the V620 switch hierarchy
 - kernel driver: `pcieport`
 
-The initial non-root `lspci -vv` commands showed `Capabilities: <access denied>`. This is a permissions limitation, not a PCIe fault. A root-level query can be used if detailed link capability/status registers are needed.
+## Second SSD Reintegration
 
-## Current PCIe Error State
+After the single-V620 baseline was restored and verified, the second SSD was reinstalled as the only hardware change.
 
-The recovery boot does **not** show a new Linux PCIe AER fatal, Surprise Link Down, or equivalent V620 link failure.
+Current configuration:
 
-The kernel notes that the HP firmware does not expose OS control of AER on several root complexes, so firmware-level PCIe diagnostics remain important on this workstation.
+- 32GB original temporary/test ECC Registered RAM
+- RTX 3050 in Slot 4
+- V620 #1 in Slot 2
+- V620 #2 removed
+- **second SSD reinstalled**
 
-Several ACPI/WMI firmware errors also appear later in boot. These are logged separately from the V620 PCIe path and are not currently being treated as evidence of a GPU link failure because the V620 subsequently initializes normally.
+Result:
+
+- **System booted successfully**
+- no POST 928 prevented startup
+
+This independently validates that the second SSD is compatible with the current stable configuration and is not the primary cause of the earlier PCIe Surprise Link Down event.
 
 ## Revised Interpretation
 
@@ -156,7 +165,7 @@ Current evidence supports the following:
 1. The **928 BDF directly maps to the root port feeding V620 #1 in physical Slot 2**.
 2. V620 #1 and its PCIe path are currently functioning normally in the restored baseline.
 3. Current V620 idle thermals are healthy.
-4. The newly installed second SSD was not the primary cause because removing it did not clear the recurring 928 state.
+4. The second SSD has now been removed and reintroduced successfully, so it is **ruled out as the primary cause** of the earlier 928 condition.
 5. Moving the RTX 3050 back to Slot 4 coincided with recovery, but this does **not** mean the 928 directly originated from the RTX; the reported failing link was the V620 #1 root-port path.
 6. The earlier dual-GPU attempt involved inadequate passive-GPU cooling and a prolonged firmware halt, so transient thermal or power instability remains a plausible contributor.
 7. A topology/resource interaction created by the RTX-in-Slot-1 / dual-V620 configuration also remains possible.
@@ -166,31 +175,29 @@ Current evidence supports the following:
 | Check | Result |
 |---|---|
 | Original temporary/test RAM at 32GB | **PASS / current** |
-| RTX 3050 in Slot 4 | **PASS / enumerated at 15:00.0** |
-| V620 #1 in Slot 2 | **PASS / enumerated at 23:00.0** |
+| RTX 3050 in Slot 4 | **PASS / known-good** |
+| V620 #1 in Slot 2 | **PASS / known-good** |
 | V620 host root port | **20:00.0 / Physical Slot 2 — mapped** |
-| V620 onboard PCIe switch | **PASS / 21:00.0 → 22:00.0 → 23:00.0** |
 | V620 host-facing link | **PCIe Gen3 x16** |
 | V620 usable VRAM | **30704M** |
 | V620 BAR / bridge aperture | **32768M / 32GB** |
 | V620 idle edge / junction / memory | **38 C / 40 C / 36 C** |
 | V620 idle board power | **~7 W** |
-| V620 #2 removed | PASS — isolated |
-| Second SSD removed | PASS — isolated |
+| Second SSD | **PASS — reinstalled and successful boot** |
+| V620 #2 | Removed / pending controlled reintegration |
 | POST 517 | Not present with current 32GB configuration |
 | Previous 928 BDF | **20:00.0 = root port feeding V620 #1** |
-| New Linux fatal PCIe/AER error on recovery boot | **Not observed** |
-| Single-V620 baseline restored | **PASS** |
-| Dual-V620 testing | Paused pending cooling / controlled reintroduction |
+| Single-V620 + dual-SSD baseline | **PASS** |
+| Dual-V620 testing | Paused pending cooling / controlled reintegration |
 
 ## Recommended Next Step
 
-Keep the present hardware configuration unchanged and perform several normal cold boots / reboots. Confirm that POST 928 does not recur.
+The second SSD is now independently validated and can remain installed.
 
-If the baseline remains stable across repeated boots, reintroduce the second SSD as the next single variable and verify a clean boot again. Only after storage is independently validated should V620 #2 be reconsidered.
+Before reintroducing V620 #2, confirm the SSD is visible and healthy in Linux and preserve the current configuration as the new known-good baseline.
 
-Dual-V620 sustained testing remains deferred until both passive cards have proper directed airflow.
+Dual-V620 testing should resume only as a controlled next step, with V620 #2 as the only added variable and with its auxiliary power path and cooling arrangement verified before sustained load.
 
 ## Engineering Takeaway
 
-The restored baseline now passes enumeration, driver initialization, BAR allocation, PCIe bridge mapping, and idle thermal checks. The original 928 address is confirmed as the Intel root port for physical Slot 2, but that link is currently stable. This points toward a transient thermal/power/topology event during the earlier dual-GPU configuration rather than a confirmed failed V620.
+The second SSD was successfully reintroduced without reproducing the POST 928 condition. The system now has a stable single-V620, RTX 3050, 32GB RAM, dual-SSD baseline. This narrows the unresolved fault domain to the earlier multi-GPU configuration, power/cooling conditions, or PCIe topology rather than storage.
