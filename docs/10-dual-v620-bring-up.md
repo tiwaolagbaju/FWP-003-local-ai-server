@@ -156,6 +156,17 @@ Result:
 - **System booted successfully**
 - no POST 928 prevented startup
 
+Linux storage enumeration then confirmed both NVMe drives:
+
+```text
+nvme0n1  1.8T  Sandisk Optimus 5100 2TB
+nvme1n1  1.8T  WD Blue SN5000 2TB
+```
+
+The WD Blue SN5000 remains the operating-system disk with EFI, `/boot`, LUKS encryption, LVM, and the root filesystem. The SanDisk Optimus 5100 is present as a separate secondary disk.
+
+The `nvme` userspace utility was not yet installed, so `sudo nvme list` returned `command not found`. This is a software-tooling gap only; kernel/block-device enumeration already confirms that both drives are present.
+
 This independently validates that the second SSD is compatible with the current stable configuration and is not the primary cause of the earlier PCIe Surprise Link Down event.
 
 ## Revised Interpretation
@@ -165,7 +176,7 @@ Current evidence supports the following:
 1. The **928 BDF directly maps to the root port feeding V620 #1 in physical Slot 2**.
 2. V620 #1 and its PCIe path are currently functioning normally in the restored baseline.
 3. Current V620 idle thermals are healthy.
-4. The second SSD has now been removed and reintroduced successfully, so it is **ruled out as the primary cause** of the earlier 928 condition.
+4. The second SSD has now been removed, reintroduced, and enumerated successfully, so it is **ruled out as the primary cause** of the earlier 928 condition.
 5. Moving the RTX 3050 back to Slot 4 coincided with recovery, but this does **not** mean the 928 directly originated from the RTX; the reported failing link was the V620 #1 root-port path.
 6. The earlier dual-GPU attempt involved inadequate passive-GPU cooling and a prolonged firmware halt, so transient thermal or power instability remains a plausible contributor.
 7. A topology/resource interaction created by the RTX-in-Slot-1 / dual-V620 configuration also remains possible.
@@ -183,7 +194,9 @@ Current evidence supports the following:
 | V620 BAR / bridge aperture | **32768M / 32GB** |
 | V620 idle edge / junction / memory | **38 C / 40 C / 36 C** |
 | V620 idle board power | **~7 W** |
-| Second SSD | **PASS — reinstalled and successful boot** |
+| WD Blue SN5000 2TB | **PASS — OS drive** |
+| SanDisk Optimus 5100 2TB | **PASS — enumerated as secondary disk** |
+| `nvme-cli` | Not installed yet |
 | V620 #2 | Removed / pending controlled reintegration |
 | POST 517 | Not present with current 32GB configuration |
 | Previous 928 BDF | **20:00.0 = root port feeding V620 #1** |
@@ -192,12 +205,12 @@ Current evidence supports the following:
 
 ## Recommended Next Step
 
-The second SSD is now independently validated and can remain installed.
+The dual-SSD configuration is now validated and can remain installed.
 
-Before reintroducing V620 #2, confirm the SSD is visible and healthy in Linux and preserve the current configuration as the new known-good baseline.
+Optionally install `nvme-cli` and capture SMART / health data for both drives before using the SanDisk as application/model storage.
 
-Dual-V620 testing should resume only as a controlled next step, with V620 #2 as the only added variable and with its auxiliary power path and cooling arrangement verified before sustained load.
+Dual-V620 testing should resume only as a controlled next step, with V620 #2 as the only added hardware variable and with its auxiliary power path and cooling arrangement verified before sustained load.
 
 ## Engineering Takeaway
 
-The second SSD was successfully reintroduced without reproducing the POST 928 condition. The system now has a stable single-V620, RTX 3050, 32GB RAM, dual-SSD baseline. This narrows the unresolved fault domain to the earlier multi-GPU configuration, power/cooling conditions, or PCIe topology rather than storage.
+The second SSD was successfully reintroduced and both NVMe devices enumerate correctly under Linux. The system now has a stable single-V620, RTX 3050, 32GB RAM, dual-SSD baseline. This narrows the unresolved fault domain to the earlier multi-GPU configuration, power/cooling conditions, or PCIe topology rather than storage.
