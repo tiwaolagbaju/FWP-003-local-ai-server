@@ -130,6 +130,27 @@ The headless SSH warning about `DISPLAY` not being set is expected and does not 
 
 This confirms that the dual-V620 Vulkan compute stack is operational at the device-discovery level.
 
+## llama.cpp Device Visibility
+
+The Vulkan-enabled `llama.cpp` build also detects both V620 accelerators successfully.
+
+`llama-cli --list-devices` reports:
+
+```text
+Vulkan0: NVIDIA GeForce RTX 3050 (6390 MiB, 5860 MiB free)
+Vulkan1: AMD Radeon Pro V620 (RADV NAVI21) (30704 MiB, 30687 MiB free)
+Vulkan2: AMD Radeon Pro V620 (RADV NAVI21) (30704 MiB, 30687 MiB free)
+```
+
+This confirms:
+
+- both V620s are visible to the application layer
+- each exposes approximately **30.7GB usable VRAM** to llama.cpp
+- each had approximately **30.687GB free** at the time of discovery
+- the RTX 3050 remains visible separately as the display GPU
+
+No model load was performed during this check, so this remains device-discovery validation rather than a load test.
+
 ## Result
 
 | Check | Result |
@@ -147,30 +168,33 @@ This confirms that the dual-V620 Vulkan compute stack is operational at the devi
 | POST 928 / Surprise Link Down | **Not reproduced** |
 | Dual-V620 Linux enumeration | **PASS** |
 | Dual-V620 Vulkan visibility | **PASS** |
+| llama.cpp dual-device visibility | **PASS** |
 | Second-card power adapter | **POST/idle validated only** |
-| llama.cpp dual-device visibility | Pending |
+| Short dual-GPU inference | Pending |
 | Sustained dual-GPU load | Pending |
 
 ## Interpretation
 
-This is the first successful dual-V620 Linux and Vulkan validation in the project.
+This is the first successful dual-V620 Linux, Vulkan, and llama.cpp device-discovery validation in the project.
 
-The earlier fault is no longer reproducible under the current configuration. Both accelerators are functional, both PCIe x16 host paths train correctly, both 32GB BARs are allocated simultaneously, both cards initialize with GECC and `amdgpu`, and both are visible to the Vulkan userspace stack through Mesa RADV.
+The earlier fault is no longer reproducible under the current configuration. Both accelerators are functional, both PCIe x16 host paths train correctly, both 32GB BARs are allocated simultaneously, both cards initialize with GECC and `amdgpu`, both are visible to the Vulkan userspace stack through Mesa RADV, and llama.cpp sees both as available accelerator devices.
 
 The remaining validation work is now focused on:
 
 - final directed airflow for both passive accelerators
 - controlled load testing of the second-card power adapter/path
-- llama.cpp visibility with both V620s
-- short-duration single-GPU and dual-GPU inference tests
+- short-duration dual-GPU inference
 - sustained thermal / power monitoring
+- later large-model multi-GPU performance benchmarking
 
 ## Next Step
 
-Verify that the Vulkan-enabled llama.cpp build sees both Radeon Pro V620 devices.
+Use a small existing GGUF model for the first controlled application load. Keep the test short and monitor both V620s continuously.
 
-Do **not** jump directly to a long model run. After llama.cpp device discovery passes, perform a short, low-risk workload while continuously monitoring both cards. The second-card power adapter should remain classified as provisional until it passes controlled current and thermal validation under load.
+The first load test should be intentionally modest. Its purpose is not performance benchmarking; it is to confirm that both cards can execute compute simultaneously without PCIe faults, thermal runaway, power instability, or adapter overheating.
+
+The second-card power adapter should remain classified as provisional until it passes controlled load validation.
 
 ## Engineering Takeaway
 
-The system now successfully boots with two independently validated Radeon Pro V620 accelerators installed at the same time. Both expose full 32GB BAR apertures, settle at approximately 30.7GB usable VRAM with GECC enabled, operate over separate PCIe Gen3 x16 host links, and enumerate successfully through the Vulkan RADV stack. This marks the transition from hardware bring-up into application-level dual-GPU compute validation.
+The system now successfully boots with two independently validated Radeon Pro V620 accelerators installed at the same time. Both expose full 32GB BAR apertures, settle at approximately 30.7GB usable VRAM with GECC enabled, operate over separate PCIe Gen3 x16 host links, enumerate successfully through Mesa RADV, and are independently visible to llama.cpp. Hardware bring-up and application device discovery are complete; the project can now move into controlled dual-GPU compute testing.
