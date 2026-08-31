@@ -19,7 +19,7 @@ The llama.cpp build was rebuilt with HTTPS/OpenSSL support after the first Huggi
 In three short sentences, explain what a UPS does in a data center.
 ```
 
-## Result
+## Inference Result
 
 The model loaded and completed inference successfully.
 
@@ -36,6 +36,36 @@ Measured llama.cpp performance:
 
 No application crash or obvious PCIe failure occurred during this run.
 
+## Verified Dual-GPU Load Capture
+
+A follow-up run was monitored live with Linux `sensors` while inference was active. Both V620s clearly left their idle states simultaneously.
+
+### V620 #1 — `amdgpu-pci-2300`
+
+Observed during active compute:
+
+- edge: **50 C**
+- junction: **51 C**
+- memory: **44 C**
+- PPT: **71 W**
+- shader clock: **884 MHz**
+- memory clock: **1000 MHz**
+
+### V620 #2 — `amdgpu-pci-2f00`
+
+Observed during active compute:
+
+- edge: **46 C**
+- junction: **51 C**
+- memory: **48 C**
+- PPT: **82 W**
+- shader clock: **971 MHz**
+- memory clock: **1000 MHz**
+
+For comparison, both cards had previously idled around **7 W**, `sclk` 0 Hz, and memory clock 96 MHz. The simultaneous increase in board power and clocks confirms that both accelerators were actively participating in compute.
+
+The captured temperatures remained low during this short run, with both junction temperatures at **51 C** in the observed sample.
+
 ## Status
 
 | Validation item | Result |
@@ -45,26 +75,36 @@ No application crash or obvious PCIe failure occurred during this run.
 | Prompt processing | **150.0 t/s** |
 | Generation | **62.8 t/s** |
 | Application stability during short run | **PASS** |
-| Confirmed simultaneous load on both V620s | Pending verification |
-| V620 peak thermals during run | Pending capture |
-| V620 peak board power during run | Pending capture |
-| Second-card adapter load validation | Pending |
+| Confirmed simultaneous load on both V620s | **PASS** |
+| V620 #1 observed active PPT | **71 W** |
+| V620 #2 observed active PPT | **82 W** |
+| V620 #1 observed junction temp | **51 C** |
+| V620 #2 observed junction temp | **51 C** |
+| Short-duration dual-GPU compute | **PASS** |
+| Second-card power path under short application load | **PASS — provisional** |
+| Sustained / high-power adapter validation | Pending |
 | Sustained dual-GPU inference | Pending |
 
-## Important Qualification
+## Interpretation
 
-The inference command was configured to target both V620 devices, but no simultaneous utilization / thermal capture was preserved from the run. Therefore this checkpoint documents a successful application-level inference test, not yet a fully proven dual-GPU load test.
+This is the first **verified simultaneous dual-V620 compute load** in the project.
 
-Before classifying the power adapter or dual-GPU compute path as load validated, repeat a short inference while monitoring both V620s and confirm that both cards show increased power / clocks and remain thermally stable.
+Both accelerators moved well above their approximately 7 W idle state, raised shader and memory clocks, and remained thermally controlled while llama.cpp inference was running. This establishes that the application stack can execute work on both V620 devices at the same time.
+
+The second-card power path also remained functional during this short application workload. However, the observed load of approximately 82 W on that GPU is substantially below the card's possible maximum power level, so this does **not** establish long-duration or full-power adapter safety.
 
 ## Next Step
 
-Repeat a short controlled model run while recording both `amdgpu` sensor blocks. Confirm:
+The next milestone should increase duration before increasing model size or power aggressively.
 
-- both V620s leave idle power state
-- temperatures rise in a controlled manner
-- no PCIe / AER / Surprise Link Down event occurs
-- the second-card power path remains stable
-- no adapter or connector shows abnormal heating
+Recommended progression:
 
-Only after that should the project move to larger-model dual-GPU benchmarking.
+1. Repeat the current model with a longer generation while monitoring both V620s.
+2. Capture the highest observed junction temperature and PPT for each card over several minutes.
+3. Check for new PCIe / AER / Surprise Link Down events after the run.
+4. Physically inspect the second-card adapter/cable and connectors for abnormal heat, odor, discoloration, or softening.
+5. Only after that passes move to larger models that make meaningful use of the approximately 61.4GB aggregate usable VRAM.
+
+## Engineering Takeaway
+
+The workstation has progressed from dual-GPU enumeration to **verified simultaneous dual-GPU inference**. Both Radeon Pro V620 accelerators were observed performing compute concurrently through llama.cpp/Vulkan, with a short-run sample of 71 W and 82 W respectively and both junction temperatures at 51 C. This is a successful controlled-load milestone, while sustained thermal and power-path qualification remains intentionally separate.
