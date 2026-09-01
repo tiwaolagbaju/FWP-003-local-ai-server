@@ -33,6 +33,38 @@ The exact jumper/pinout procedure is intentionally not documented here or presen
 
 Important distinction: suppressing the firmware warning does **not** add airflow or establish that the DIMMs are adequately cooled. The current configuration therefore remains subject to controlled thermal and memory-stability validation under realistic workloads.
 
+## Temporary RAM Airflow
+
+As an interim cooling measure, the existing HDD/drive-area fans connected through the workstation's `MEM FAN2` circuit were reversed so that they direct airflow toward the populated DIMM area.
+
+This is a temporary airflow configuration rather than a final mechanical solution. It provides active air movement across the memory area while the dedicated memory-fan hardware is being planned.
+
+Because the workstation currently does not expose individual DIMM temperatures through `lm-sensors`, the effectiveness of this arrangement is being evaluated through:
+
+- system stability under memory-intensive workloads
+- host EDAC/ECC error monitoring
+- CPU/PCH/chassis thermal behavior
+- continued observation during real AI workloads that use substantial host memory
+
+The temporary fan direction should be revisited if drive-bay storage is added later, because reversing those fans changes the original airflow through the drive area.
+
+## Planned Dedicated Memory-Fan Mod
+
+A later project improvement is planned using the open-source **HP Z6 G4 Memory Fan Mounts** project by `swthemathwiz`:
+
+- repository: `swthemathwiz/hp-z6-g4-memory-fan-mounts`
+- purpose: 3D-printable OpenSCAD fan mounts for adding dedicated memory airflow to an HP Z6 G4
+- options include a single 80 mm mount and dual 80 mm configurations
+- the dual 80/80x20 configuration is designed to provide more clearance around the disk-caddy area than the 80/80x25 configuration
+
+The upstream project explicitly notes that these mounts are not OEM replacements and do not guarantee sufficient airflow in every configuration. It is therefore being treated as a future engineering modification that will require the same thermal/stability validation approach used for the current setup.
+
+For the current single-CPU build, the project appears mechanically relevant. The upstream documentation notes that its dual mount is not intended for a second-CPU configuration.
+
+Reference:
+
+`https://github.com/swthemathwiz/hp-z6-g4-memory-fan-mounts`
+
 ## Baseline Sensor Snapshot
 
 Before memory stress testing, the system was allowed to idle and a baseline sensor capture was taken.
@@ -114,6 +146,7 @@ The only ECC-related entries remained the expected initialization messages for t
 | Linux usable memory | **~90 GiB** |
 | Balanced six-channel layout | **PASS** |
 | Firmware fan-warning suppression | **Working — non-OEM workaround** |
+| Temporary directed RAM airflow | **Installed** |
 | EDAC controllers initialized | **PASS** |
 | 70GB / 5-minute stress-ng verification | **PASS** |
 | stress-ng workers | **6/6 passed** |
@@ -122,13 +155,14 @@ The only ECC-related entries remained the expected initialization messages for t
 | Peak observed CPU package temperature | **79 C** |
 | Direct DIMM temperature telemetry | **Not exposed** |
 | Short-duration 96GB stability | **PASS** |
+| Dedicated memory-fan mod | Planned |
 | Long-duration / production thermal validation | Pending |
 
 ## Engineering Significance
 
 The 96GB six-channel memory configuration passed a controlled 70GB memory workload with verification enabled and no observed host-memory ECC errors. This provides a strong short-duration stability baseline for the upgraded system.
 
-Because individual DIMM temperatures are not exposed, this result should not be interpreted as full thermal qualification of the non-OEM memory-fan bypass. Longer workloads and real AI/CPU-offload use should continue to be monitored for stability and EDAC events.
+The temporary redirection of existing chassis airflow gives the memory area active cooling while a more purpose-built fan mount is planned. Because individual DIMM temperatures are not exposed, this result should not be interpreted as full thermal qualification of either the warning bypass or temporary airflow arrangement. Longer workloads and real AI/CPU-offload use should continue to be monitored for stability and EDAC events.
 
 ## Next Validation Step
 
