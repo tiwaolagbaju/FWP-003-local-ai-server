@@ -35,6 +35,38 @@ Important distinction: suppressing the firmware warning does **not** add airflow
 
 The workstation is intended to operate in a cool environment, but ambient temperature alone is not sufficient evidence of DIMM thermal margin under sustained memory traffic or CPU-offload workloads.
 
+## Baseline Sensor Snapshot
+
+Before memory stress testing, the system was allowed to idle and a baseline sensor capture was taken.
+
+Observed values included:
+
+- CPU package: **38 C**
+- CPU cores: approximately **33–38 C**
+- PCH: **53 C**
+- V620 #1: **44 C edge / 46 C junction / 42 C memory / ~7 W**
+- V620 #2: **44 C edge / 46 C junction / 44 C memory / ~7 W**
+- NVMe #1 composite: **~25 C**
+- NVMe #2 composite: **~36 C**
+
+Linux does **not** currently expose individual DIMM temperature sensors through `lm-sensors`, so DIMM thermal behavior cannot be measured directly from this sensor set.
+
+## EDAC / ECC Baseline
+
+The Linux EDAC subsystem initialized successfully for both Skylake memory controllers:
+
+- Socket 0 IMC #0 detected by `skx_edac`
+- Socket 0 IMC #1 detected by `skx_edac`
+
+The baseline kernel-log review showed **no corrected or uncorrected system-memory errors**.
+
+Both Radeon Pro V620 accelerators also continued to report:
+
+- MEM ECC active
+- GECC enabled
+
+These GPU ECC messages are expected and separate from host-memory EDAC monitoring.
+
 ## Result
 
 | Check | Result |
@@ -47,19 +79,23 @@ The workstation is intended to operate in a cool environment, but ambient temper
 | Linux usable memory | **~90 GiB** |
 | Balanced six-channel layout | **PASS** |
 | Firmware fan-warning suppression | **Working — non-OEM workaround** |
-| Memory thermal validation | Pending |
+| EDAC controllers initialized | **PASS** |
+| Corrected host-memory errors at baseline | **None observed** |
+| Uncorrected host-memory errors at baseline | **None observed** |
+| Direct DIMM temperature telemetry | **Not exposed** |
 | Sustained memory stability test | Pending |
 
 ## Engineering Significance
 
 The workstation now has the planned 96GB system-memory configuration in addition to the two V620 accelerators. This provides substantially more host memory for model loading, CPU/GPU offload, larger context windows, containers, and future experimentation with models that exceed aggregate GPU VRAM.
 
+The clean EDAC baseline gives a useful before-test reference. Because DIMM temperatures are not directly exposed, stability and ECC behavior under controlled memory load will be used as the primary validation signals for the current cooling configuration.
+
 ## Next Validation Step
 
 Before treating the 96GB configuration as production-stable:
 
-1. Capture baseline chassis/CPU/available memory-related sensors.
-2. Run a controlled memory stress test while monitoring temperatures.
-3. Review kernel logs for ECC/EDAC/MCE/memory errors.
-4. Confirm that the dual-V620 configuration remains stable after the RAM change.
-5. Revisit dedicated memory airflow if temperatures, corrected ECC events, or stability indicate insufficient cooling.
+1. Run a controlled memory stress test while monitoring available sensors.
+2. Review kernel logs afterward for ECC/EDAC/MCE/memory errors.
+3. Confirm that the dual-V620 configuration remains stable after the RAM change.
+4. Revisit dedicated memory airflow if corrected ECC events, instability, or other thermal symptoms appear.
