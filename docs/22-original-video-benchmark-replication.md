@@ -102,78 +102,143 @@ Projected total device-memory use was approximately **46,419 MiB** from approxim
 
 ### Performance
 
-Measured llama.cpp performance:
-
 - **Prompt processing: 102.5 tokens/s**
 - **Generation: 63.4 tokens/s**
 
-The 4K generation result is approximately **15% faster** than the video's reported ~55 t/s figure. This is not yet a direct apples-to-apples performance comparison because the source video used approximately 262K context while this baseline used only 4K.
-
 ### Thermal / Power Snapshot
 
-Captured active-load sensor snapshot:
-
-#### V620 #1
-
-- edge: **38 C**
-- junction: **38 C**
-- memory: **36 C**
-- PPT: **53 W**
-- sclk: **997 MHz**
-- mclk: **1000 MHz**
-
-#### V620 #2
-
-- edge: **36 C**
-- junction: **40 C**
-- memory: **38 C**
-- PPT: **64 W**
-- sclk: **1 GHz**
-- mclk: **1000 MHz**
-
-Captured combined PPT was approximately **117 W**. These are snapshot values rather than recorded peak or time-averaged power measurements.
+- V620 #1: **38 C junction / 36 C memory / 53 W**
+- V620 #2: **40 C junction / 38 C memory / 64 W**
+- captured combined PPT: **117 W**
 
 ### 4K Result
 
 | Check | Result |
 |---|---|
-| Qwen3 Coder Next Q4_K_M loaded | **PASS** |
-| Model architecture | **79.67B MoE / 10 experts active** |
 | Full transformer/output GPU offload | **49/49 — PASS** |
-| Both V620s used | **PASS** |
-| Pipeline parallelism | **Enabled** |
 | Context | **4096** |
 | Prompt processing | **102.5 t/s** |
 | Generation | **63.4 t/s** |
-| V620 #1 junction snapshot | **38 C** |
-| V620 #2 junction snapshot | **40 C** |
+| V620 junction snapshots | **38 / 40 C** |
 | Captured combined PPT | **117 W** |
 | Aggregate projected VRAM headroom | **~14.5 GiB** |
 
 ---
 
+## 32K Context — PASS
+
+The second validation increased the allocated context from 4096 to **32,768 tokens** while keeping the same model, two-GPU topology, quantization, prompt, and generation length.
+
+### GPU Offload
+
+The 32K run retained the exact same model-weight split:
+
+- **49/49 total loadable layers offloaded to GPU**
+- Vulkan1 model buffer: **23,764.29 MiB**
+- Vulkan2 model buffer: **22,231.40 MiB**
+- CPU_Mapped model buffer: **166.92 MiB**
+
+No model layers were moved back to CPU memory as context increased.
+
+### 32K Memory Allocation
+
+llama.cpp projected:
+
+- Vulkan1 device use: **24,418 MiB**
+- Vulkan2 device use: **22,897 MiB**
+- combined projected V620 use: **47,315 MiB**
+- combined available device memory: **61,298 MiB**
+- aggregate projected headroom: approximately **13.7 GiB**
+
+Context/runtime allocations increased to:
+
+- Vulkan1 KV cache: **384.00 MiB**
+- Vulkan2 KV cache: **384.00 MiB**
+- combined KV cache: **768.00 MiB**
+- Vulkan1 recurrent-state buffer: **39.78 MiB**
+- Vulkan2 recurrent-state buffer: **35.59 MiB**
+- Vulkan1 compute buffer: **230.23 MiB**
+- Vulkan2 compute buffer: **230.23 MiB**
+- pipeline parallelism: **enabled**
+- Flash Attention: **enabled**
+
+### 32K Performance
+
+Measured performance:
+
+- **Prompt processing: 202.7 tokens/s**
+- **Generation: 63.5 tokens/s**
+
+Generation throughput was effectively unchanged from the 4K baseline:
+
+- 4K: **63.4 t/s**
+- 32K: **63.5 t/s**
+
+The higher prompt-processing number should not be interpreted as evidence that larger context inherently improves prompt speed. The actual supplied prompt remained short, and short-prompt timing can vary substantially between runs.
+
+### 32K Thermal / Power Snapshot
+
+Captured sensor snapshot:
+
+#### V620 #1
+
+- edge: **39 C**
+- junction: **40 C**
+- memory: **38 C**
+- PPT: **52 W**
+- sclk: **792 MHz**
+- mclk: **1000 MHz**
+
+#### V620 #2
+
+- edge: **37 C**
+- junction: **42 C**
+- memory: **40 C**
+- PPT: **63 W**
+- sclk: **1 GHz**
+- mclk: **1000 MHz**
+
+Captured combined PPT was approximately **115 W**.
+
+### 32K Result
+
+| Check | Result |
+|---|---|
+| Full transformer/output GPU offload | **49/49 — PASS** |
+| Context allocation | **32,768 — PASS** |
+| Prompt processing | **202.7 t/s** |
+| Generation | **63.5 t/s** |
+| V620 junction snapshots | **40 / 42 C** |
+| Captured combined PPT | **115 W** |
+| Aggregate projected VRAM headroom | **~13.7 GiB** |
+
+### Important Benchmark Note
+
+Setting `-c 32768` allocates a 32K-capable context window, but the benchmark prompt itself does **not** contain 32K tokens. This test therefore validates **32K context capacity and memory allocation**, not performance with a fully populated 32K prompt. The same distinction will apply to the 128K and 262K replication steps unless a long prompt is deliberately supplied.
+
+---
+
 ## Comparison Table
 
-| Metric | Source Video | Brain-Box 4K | Brain-Box 262K |
-|---|---:|---:|---:|
-| Model | Qwen3 Coder Next | Qwen3 Coder Next Q4_K_M | Pending |
-| Approx. GGUF size | ~47 GB | 45.08 GiB / ~48.4 GB decimal | Pending |
-| Context | ~262K | 4K | 262,144 target |
-| Transformer blocks | 48 | 48 | Pending |
-| llama.cpp offload count | N/A | **49/49** | Pending |
-| GPUs | 2× V620 | 2× V620 | 2× V620 |
-| Prompt processing | Not captured | **102.5 t/s** | Pending |
-| Generation | ~55 t/s | **63.4 t/s** | Pending |
-| GPU temperature | ~44–45 C | **38 / 40 C junction snapshot** | Pending |
-| GPU power | ~230–270 W total | **117 W snapshot** | Pending |
+| Metric | Source Video | Brain-Box 4K | Brain-Box 32K | Brain-Box 262K |
+|---|---:|---:|---:|---:|
+| Model | Qwen3 Coder Next | Qwen3 Coder Next Q4_K_M | Same | Pending |
+| Approx. GGUF size | ~47 GB | 45.08 GiB / ~48.4 GB decimal | Same | Pending |
+| Allocated context | ~262K | 4K | **32K** | 262,144 target |
+| Transformer blocks | 48 | 48 | 48 | Pending |
+| llama.cpp offload count | N/A | **49/49** | **49/49** | Pending |
+| GPUs | 2× V620 | 2× V620 | 2× V620 | 2× V620 |
+| Prompt processing | Not captured | **102.5 t/s** | **202.7 t/s** | Pending |
+| Generation | ~55 t/s | **63.4 t/s** | **63.5 t/s** | Pending |
+| GPU junction | ~44–45 C | **38 / 40 C** | **40 / 42 C** | Pending |
+| GPU power | ~230–270 W total | **117 W snapshot** | **115 W snapshot** | Pending |
 
 ## Remaining Validation Steps
 
-1. Run a **32K context** validation.
-2. Run a **128K context** validation.
-3. Attempt the full **262,144-token context** target.
-4. Record post-run GPU/PCIe/AER health after the heavy-context tests.
-5. Compare the final 262K generation result directly to the video's approximately 55 t/s result.
+1. Run a **128K context** validation.
+2. Attempt the full **262,144-token context** target.
+3. Record post-run GPU/PCIe/AER health after the heavy-context tests.
+4. Compare the final 262K generation result directly to the video's approximately 55 t/s result.
 
 ## Acceptance Criteria
 
