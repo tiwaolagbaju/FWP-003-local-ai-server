@@ -31,6 +31,15 @@ The four 40 mm GPU fans are split across two motherboard fan circuits:
 
 This distributes the four added GPU fans instead of placing all of them on a single header.
 
+## Current BIOS Fan Configuration
+
+The workstation BIOS is currently configured with an aggressive minimum airflow floor:
+
+- **Increase Idle Fan Speed: 80%**
+- **Increase PCIe Idle Fan Speed: 80%**
+
+These settings are being retained for now because the resulting noise level is acceptable and GPU temperatures are well controlled. They are treated as HP firmware fan-control offsets/minimums rather than assumed literal fixed 80% PWM duty on every fan.
+
 ## Added Electrical Load
 
 The Noctua NF-A4x20 PWM is rated at:
@@ -87,6 +96,24 @@ The workload generated at approximately **64.8 tokens/s**, confirming active sim
 
 The first card ran approximately 5 C warmer at the junction than the second card in this snapshot, but both remained far below their reported critical temperature thresholds.
 
+## Planned Fan-Control Upgrade
+
+A future upgrade under consideration is the **ARCTIC Fan Controller (ACFAN00351A)**.
+
+Relevant characteristics:
+
+- 10 independent 4-pin PWM fan channels
+- SATA-powered fan output rather than drawing fan power from motherboard headers
+- internal USB 2.0 connection for software control
+- independent channel RPM monitoring
+- up to 2 A per port and 4.5 A total controller capacity
+
+This would allow the four V620 cooling fans to be moved off the HP MEM FAN1/AUX FAN circuits and onto individually controlled channels. The intended end state is to tie each GPU's two cooling fans to a software fan curve based on that V620's temperature sensors, while leaving room for future RAM or chassis-fan control.
+
+This upgrade would also remove the current uncertainty around the exact HP motherboard fan-header current limits.
+
+At the time of planning, ARCTIC states that native Linux driver support is targeted for the Linux 7.2 kernel. The current Ubuntu installation uses a 7.0-series kernel, so software-control compatibility should be verified again before purchase or installation.
+
 ## Result
 
 | Check | Result |
@@ -98,6 +125,8 @@ The first card ran approximately 5 C warmer at the junction than the second card
 | MEM FAN1 GPU-fan load | **2 × 40 mm fans** |
 | AUX FAN GPU-fan load | **2 × 40 mm fans** |
 | Added fan current per circuit | **~0.10 A max** |
+| Increase Idle Fan Speed | **80%** |
+| Increase PCIe Idle Fan Speed | **80%** |
 | Directed airflow on both passive V620s | **Implemented** |
 | Idle dual-GPU health check | **PASS** |
 | Idle V620 junction temperatures | **35–36 C** |
@@ -108,8 +137,9 @@ The first card ran approximately 5 C warmer at the junction than the second card
 | Captured dual-GPU PPT | **74 W / 83 W** |
 | Dual-GPU inference under permanent cooling | **PASS — short duration** |
 | GPU/PCIe error check | **Clean at idle health check** |
+| ARCTIC software fan controller | **Planned / compatibility verification pending** |
 | Long-duration thermal validation | Pending |
-| Motherboard header current-limit verification | Pending |
+| Motherboard header current-limit verification | Pending while motherboard headers remain in use |
 
 ## Engineering Significance
 
@@ -117,8 +147,8 @@ The passive V620s now have a purpose-built permanent cooling solution rather tha
 
 The permanent setup demonstrated very low idle temperatures and kept both GPU junction temperatures below 60 C during active dual-GPU inference at roughly 74–83 W per card. This is an encouraging thermal result for passive server accelerators adapted to a workstation chassis.
 
+The planned dedicated fan controller would be a refinement rather than a requirement for current operation: it would add per-fan software control, RPM monitoring, component-specific fan curves, and remove the V620 fan electrical load from the HP motherboard fan headers.
+
 ## Next Validation Step
 
-The permanent cooling system has passed its first active-compute check. The next useful validation is a longer and larger-model workload while monitoring both V620 edge, junction, memory temperature, clocks, and PPT separately, followed by a PCIe/AER log review.
-
-If those results remain clean, the cooling portion of the physical build can be considered validated for sustained benchmarking.
+The current cooling configuration is acceptable for continued use and benchmarking. Future work can focus on longer-duration model runs and, once Linux support is confirmed, migration to the dedicated software-controlled fan controller.
