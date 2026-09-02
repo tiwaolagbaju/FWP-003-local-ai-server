@@ -213,6 +213,26 @@ Captured combined PPT was approximately **113 W**.
 
 ---
 
+## Post-Run GPU / PCIe Health Check — PASS
+
+After completing the 262K benchmark, the kernel log was filtered for:
+
+- AMD GPU faults
+- timeouts
+- resets
+- PCIe Bus Errors
+- AER errors
+- uncorrected errors
+- Surprise Link Down events
+
+The only matching entries were the informational AMD messages stating that Trusted Memory Zone (TMZ) is disabled by default because it is experimental.
+
+No GPU reset, timeout, PCIe bus error, AER error, uncorrected error, or Surprise Link Down event was observed.
+
+**Post-run GPU / PCIe health: PASS**
+
+---
+
 ## Context-Scaling Comparison
 
 | Metric | Source Video | Brain-Box 4K | Brain-Box 32K | Brain-Box 128K | Brain-Box 262K |
@@ -225,24 +245,22 @@ Captured combined PPT was approximately **113 W**.
 | Junction snapshot | ~44–45 C | 38 / 40 C | 40 / 42 C | 41 / 42 C | **39 / 42 C** |
 | Combined PPT snapshot | ~230–270 W | 117 W | 115 W | 118 W | **113 W** |
 | Projected VRAM headroom | Not stated | ~14.5 GiB | ~13.7 GiB | ~10.7 GiB | **~6.7 GiB** |
+| Post-run GPU/PCIe health | Not stated | — | — | — | **PASS** |
 
-## Replication Status
+## Final Replication Status — PASS
 
-The configured maximum-context replication target is **PASS**:
+The configured maximum-context replication target is complete:
 
-- same broad model family and size class
+- same broad Qwen3 Coder Next model family and size class
 - same dual-V620 64 GB physical-VRAM concept
-- full native 262,144-token context allocated
+- full native **262,144-token context** allocated
 - all model layers offloaded across the V620s
 - generation measured at **64.3 t/s**
 - thermals remained in the low-40 C range in the captured snapshot
+- post-run GPU/PCIe kernel health remained clean
 
-The remaining validation item is a post-run kernel/PCIe/AER health check.
+**Original-video benchmark replication: PASS**
 
 ## Important Benchmark Note
 
 Allocating `-c 262144` reserves the model's full context capacity but does not itself populate the context with 262,144 prompt tokens. A true full-context throughput test would require feeding a prompt close to that size. This should be treated as a separate long-context stress benchmark rather than conflated with the video's configured-context replication.
-
-## Remaining Validation Step
-
-Run the post-test AMD GPU / PCIe / AER kernel-health check and record the result.
