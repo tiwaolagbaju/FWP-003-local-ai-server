@@ -42,12 +42,10 @@ This is therefore documented as a **near-exact benchmark replication**, not a by
 - Compute GPUs: **2× Radeon Pro V620 32 GB**
 - Display GPU excluded from text inference
 - Model: `Qwen/Qwen3-Coder-Next-GGUF:Q4_K_M`
-- Final context target: **262,144 tokens**
+- Maximum context: **262,144 tokens**
 - GPU layers: all available layers
 - Tensor split: 1:1
 - Multimodal projector: disabled for text-only benchmarking
-
-The benchmark is being scaled progressively through smaller contexts before the final 262K replication target.
 
 ## Model Architecture Confirmed
 
@@ -61,7 +59,7 @@ llama.cpp reports:
 - experts selected per token: **10**
 - native context: **262,144 tokens**
 
-Across all completed tests so far, model-weight placement has remained constant:
+Across all completed tests, model-weight placement remained constant:
 
 - output layer offloaded to GPU
 - 47 repeating layers offloaded to GPU
@@ -78,149 +76,140 @@ The 49/49 count includes the output layer in addition to the model's 48 transfor
 
 ## 4K Baseline — PASS
 
-Context: **4,096 tokens**
-
-Runtime allocations:
-
-- Vulkan1 KV cache: **48 MiB**
-- Vulkan2 KV cache: **48 MiB**
-- Vulkan1 recurrent-state buffer: **39.78 MiB**
-- Vulkan2 recurrent-state buffer: **35.59 MiB**
-- Vulkan1 compute buffer: **118.23 MiB**
-- Vulkan2 compute buffer: **118.23 MiB**
-- projected combined device use: **46,419 MiB**
-- projected aggregate VRAM headroom: **~14.5 GiB**
-
-Performance:
-
-- Prompt processing: **102.5 t/s**
+- Context: **4,096**
+- Prompt: **102.5 t/s**
 - Generation: **63.4 t/s**
-
-Captured sensor snapshot:
-
-- V620 #1: **38 C junction / 36 C memory / 53 W**
-- V620 #2: **40 C junction / 38 C memory / 64 W**
-- combined PPT snapshot: **117 W**
+- Projected GPU use: **46,419 MiB**
+- Projected aggregate VRAM headroom: **~14.5 GiB**
+- Junction snapshots: **38 / 40 C**
+- Combined PPT snapshot: **117 W**
 
 ---
 
 ## 32K Context — PASS
 
-Context: **32,768 tokens**
-
-Runtime allocations:
-
-- Vulkan1 KV cache: **384 MiB**
-- Vulkan2 KV cache: **384 MiB**
-- combined KV cache: **768 MiB**
-- Vulkan1 compute buffer: **230.23 MiB**
-- Vulkan2 compute buffer: **230.23 MiB**
-- projected combined device use: **47,315 MiB**
-- projected aggregate VRAM headroom: **~13.7 GiB**
-
-Performance:
-
-- Prompt processing: **202.7 t/s**
+- Context: **32,768**
+- Prompt: **202.7 t/s**
 - Generation: **63.5 t/s**
-
-Captured sensor snapshot:
-
-- V620 #1: **40 C junction / 38 C memory / 52 W**
-- V620 #2: **42 C junction / 40 C memory / 63 W**
-- combined PPT snapshot: **115 W**
-
-Generation throughput was effectively unchanged from the 4K baseline.
+- Combined KV cache: **768 MiB**
+- Projected GPU use: **47,315 MiB**
+- Projected aggregate VRAM headroom: **~13.7 GiB**
+- Junction snapshots: **40 / 42 C**
+- Combined PPT snapshot: **115 W**
 
 ---
 
 ## 128K Context — PASS
 
-The third validation increased the allocated context to **131,072 tokens**, exactly half the model's native 262,144-token context.
+- Context: **131,072**
+- Prompt: **203.2 t/s**
+- Generation: **64.7 t/s**
+- Combined KV cache: **3,072 MiB (3 GiB)**
+- Projected GPU use: **50,387 MiB**
+- Projected aggregate VRAM headroom: **~10.7 GiB**
+- Junction snapshots: **41 / 42 C**
+- Combined PPT snapshot: **118 W**
+
+---
+
+## 262K Native Maximum Context — PASS
+
+The final replication run requested the model's full native context:
+
+- **n_ctx = 262,144**
+- **n_ctx_train = 262,144**
+
+Unlike the smaller-context runs, llama.cpp did not report that the allocated context was below the model's training context. The full native context allocation was accepted without silent reduction.
 
 ### Full GPU Offload
 
-The model again remained completely GPU-offloaded:
+The maximum-context run retained complete GPU offload:
 
+- output layer offloaded to GPU
+- 47 repeating layers offloaded to GPU
 - **49/49 total loadable layers offloaded to GPU**
 - Vulkan1 model buffer: **23,764.29 MiB**
 - Vulkan2 model buffer: **22,231.40 MiB**
 - CPU_Mapped model buffer: **166.92 MiB**
 
-No model layers were moved back to system memory.
+No transformer layers were moved to system RAM.
 
-### 128K Memory Allocation
+### 262K Memory Allocation
 
 llama.cpp projected:
 
-- Vulkan1 device use: **25,954 MiB**
-- Vulkan2 device use: **24,433 MiB**
-- combined projected V620 use: **50,387 MiB**
+- Vulkan1 device use: **28,002 MiB**
+- Vulkan2 device use: **26,481 MiB**
+- combined projected V620 use: **54,483 MiB**
 - combined available device memory: **61,298 MiB**
-- aggregate projected headroom: **10,911 MiB (~10.7 GiB)**
+- aggregate projected headroom: **6,815 MiB (~6.7 GiB)**
 
 Runtime allocations:
 
-- Vulkan1 KV cache: **1,536 MiB**
-- Vulkan2 KV cache: **1,536 MiB**
-- combined KV cache: **3,072 MiB (3 GiB)**
+- Vulkan1 KV cache: **3,072 MiB**
+- Vulkan2 KV cache: **3,072 MiB**
+- combined KV cache: **6,144 MiB (6 GiB)**
 - Vulkan1 recurrent-state buffer: **39.78 MiB**
 - Vulkan2 recurrent-state buffer: **35.59 MiB**
-- Vulkan1 compute buffer: **614.23 MiB**
-- Vulkan2 compute buffer: **614.23 MiB**
-- Host compute buffer: **520.05 MiB**
+- Vulkan1 compute buffer: **1,126.23 MiB**
+- Vulkan2 compute buffer: **1,126.23 MiB**
+- Host compute buffer: **1,032.05 MiB**
 - pipeline parallelism: **enabled**
 - Flash Attention: **enabled**
 
-### 128K Performance
+### 262K Performance
 
 Measured performance:
 
-- **Prompt processing: 203.2 tokens/s**
-- **Generation: 64.7 tokens/s**
+- **Prompt processing: 202.5 tokens/s**
+- **Generation: 64.3 tokens/s**
 
-Generation throughput remained extremely stable across the allocated-context tests:
+Generation throughput remained remarkably stable across context allocations:
 
 - 4K: **63.4 t/s**
 - 32K: **63.5 t/s**
 - 128K: **64.7 t/s**
+- 262K: **64.3 t/s**
 
-The supplied prompt remains short, so these tests validate context allocation and available-memory behavior rather than performance with a fully populated long prompt.
+The 262K generation result is approximately **17% higher** than the video's reported ~55 t/s result.
 
-### 128K Thermal / Power Snapshot
+This is still not a strict apples-to-apples throughput comparison because the current command allocates a 262K context window but supplies only a short prompt. It does, however, reproduce the video's maximum-context configuration and confirms that the full context can coexist with complete dual-V620 model offload.
 
-Captured sensor snapshot:
+### 262K Thermal / Power Snapshot
 
 #### V620 #1
 
-- edge: **40 C**
-- junction: **41 C**
+- edge: **39 C**
+- junction: **39 C**
 - memory: **38 C**
-- PPT: **54 W**
-- sclk: **1 GHz**
+- PPT: **52 W**
+- sclk: **827 MHz**
 - mclk: **1000 MHz**
 
 #### V620 #2
 
-- edge: **38 C**
+- edge: **37 C**
 - junction: **42 C**
 - memory: **40 C**
-- PPT: **64 W**
-- sclk: **1 GHz**
+- PPT: **61 W**
+- sclk: **873 MHz**
 - mclk: **1000 MHz**
 
-Captured combined PPT was approximately **118 W**.
+Captured combined PPT was approximately **113 W**.
 
-### 128K Result
+### 262K Result
 
 | Check | Result |
 |---|---|
+| Native 262,144 context allocated | **PASS** |
+| Silent context reduction | **None observed** |
 | Full transformer/output GPU offload | **49/49 — PASS** |
-| Context allocation | **131,072 — PASS** |
-| Prompt processing | **203.2 t/s** |
-| Generation | **64.7 t/s** |
-| V620 junction snapshots | **41 / 42 C** |
-| Captured combined PPT | **118 W** |
-| Aggregate projected VRAM headroom | **~10.7 GiB** |
+| Prompt processing | **202.5 t/s** |
+| Generation | **64.3 t/s** |
+| V620 junction snapshots | **39 / 42 C** |
+| Combined PPT snapshot | **113 W** |
+| Combined KV cache | **6 GiB** |
+| Projected aggregate VRAM headroom | **~6.7 GiB** |
 
 ---
 
@@ -228,35 +217,32 @@ Captured combined PPT was approximately **118 W**.
 
 | Metric | Source Video | Brain-Box 4K | Brain-Box 32K | Brain-Box 128K | Brain-Box 262K |
 |---|---:|---:|---:|---:|---:|
-| Model | Qwen3 Coder Next | Q4_K_M | Q4_K_M | Q4_K_M | Pending |
-| Allocated context | ~262K | 4K | 32K | 128K | 262,144 target |
-| GPU offload | all blocks | **49/49** | **49/49** | **49/49** | Pending |
-| Prompt processing | Not captured | **102.5** | **202.7** | **203.2** | Pending |
-| Generation | ~55 t/s | **63.4** | **63.5** | **64.7** | Pending |
-| Junction snapshot | ~44–45 C | **38 / 40 C** | **40 / 42 C** | **41 / 42 C** | Pending |
-| Combined PPT snapshot | ~230–270 W | **117 W** | **115 W** | **118 W** | Pending |
-| Projected VRAM headroom | Not stated | **~14.5 GiB** | **~13.7 GiB** | **~10.7 GiB** | Pending |
+| Model | Qwen3 Coder Next | Q4_K_M | Q4_K_M | Q4_K_M | **Q4_K_M** |
+| Allocated context | ~262K | 4K | 32K | 128K | **262,144** |
+| GPU offload | all blocks | **49/49** | **49/49** | **49/49** | **49/49** |
+| Prompt processing | Not captured | 102.5 | 202.7 | 203.2 | **202.5** |
+| Generation | ~55 t/s | 63.4 | 63.5 | 64.7 | **64.3** |
+| Junction snapshot | ~44–45 C | 38 / 40 C | 40 / 42 C | 41 / 42 C | **39 / 42 C** |
+| Combined PPT snapshot | ~230–270 W | 117 W | 115 W | 118 W | **113 W** |
+| Projected VRAM headroom | Not stated | ~14.5 GiB | ~13.7 GiB | ~10.7 GiB | **~6.7 GiB** |
+
+## Replication Status
+
+The configured maximum-context replication target is **PASS**:
+
+- same broad model family and size class
+- same dual-V620 64 GB physical-VRAM concept
+- full native 262,144-token context allocated
+- all model layers offloaded across the V620s
+- generation measured at **64.3 t/s**
+- thermals remained in the low-40 C range in the captured snapshot
+
+The remaining validation item is a post-run kernel/PCIe/AER health check.
 
 ## Important Benchmark Note
 
-Allocating a context window with `-c` does not fill it with prompt tokens. The current runs establish that llama.cpp can reserve the requested context while retaining full GPU offload and measure short-prompt generation throughput under that allocation.
+Allocating `-c 262144` reserves the model's full context capacity but does not itself populate the context with 262,144 prompt tokens. A true full-context throughput test would require feeding a prompt close to that size. This should be treated as a separate long-context stress benchmark rather than conflated with the video's configured-context replication.
 
-A true long-context throughput benchmark would require feeding tens or hundreds of thousands of actual prompt tokens. That is a separate test from reproducing the video's configured maximum-context setup.
+## Remaining Validation Step
 
-## Remaining Validation Steps
-
-1. Attempt the full **262,144-token context** target.
-2. Confirm full 49/49 layer offload at maximum context.
-3. Capture projected VRAM use, KV/cache buffers, performance, thermals, and power.
-4. Run the post-test GPU/PCIe/AER kernel-health check.
-5. Compare the final maximum-context result directly with the video's approximately **55 t/s** reported generation figure.
-
-## Acceptance Criteria
-
-The replication will be considered successful if:
-
-1. Qwen3 Coder Next loads across both V620s.
-2. All model layers remain GPU-offloaded.
-3. The requested **262,144-token context** is retained without silent reduction.
-4. Generation throughput, thermals, and power are recorded under the same broad class of workload.
-5. Any difference from the video is documented with likely variables such as quantization, runtime version, LM Studio vs direct llama.cpp execution, CPU/platform differences, and cooling configuration.
+Run the post-test AMD GPU / PCIe / AER kernel-health check and record the result.
