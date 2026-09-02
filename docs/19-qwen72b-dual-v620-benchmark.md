@@ -51,6 +51,22 @@ Both GPUs were under active load. The hotter card reached **77 C junction temper
 
 The card-to-card clock difference in this single snapshot should not be interpreted as a persistent imbalance without time-series data, since layer scheduling and instantaneous utilization can vary during inference.
 
+## Post-Run Kernel / PCIe Health Check
+
+After the 72B benchmark, the kernel log was filtered for:
+
+- AMD GPU faults
+- timeouts
+- resets
+- PCIe Bus Errors
+- AER errors
+- uncorrected errors
+- Surprise Link Down events
+
+The only matching entries were the informational AMD messages stating that Trusted Memory Zone (TMZ) is disabled by default because it is experimental.
+
+No GPU reset, timeout, PCIe bus error, AER error, uncorrected error, or Surprise Link Down event was observed.
+
 ## Current Status
 
 | Check | Result |
@@ -66,7 +82,7 @@ The card-to-card clock difference in this single snapshot should not be interpre
 | V620 #1 PPT | **111 W** |
 | V620 #2 PPT | **110 W** |
 | 72B inference functionality | **PASS** |
-| Post-run GPU/PCIe kernel health | Pending |
+| Post-run GPU/PCIe kernel health | **PASS** |
 | Exact VRAM / CPU-offload allocation confirmation | Pending |
 
 ## Engineering Significance
@@ -79,6 +95,5 @@ Thermals are higher than the 32B benchmark but still controlled. A longer-durati
 
 ## Next Validation Step
 
-1. Review the kernel log for AMD GPU resets, timeouts, PCIe Bus Errors, AER errors, uncorrected errors, and Surprise Link Down events.
-2. Capture model-load memory/allocation output on the next 72B run to determine the exact GPU-resident versus CPU-offloaded configuration.
-3. Run a longer 72B workload while recording per-card temperature and power over time.
+1. Capture model-load memory/allocation output on the next 72B run to determine the exact GPU-resident versus CPU-offloaded configuration.
+2. Run a longer 72B workload while recording per-card temperature and power over time.
