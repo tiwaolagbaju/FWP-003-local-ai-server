@@ -2,7 +2,7 @@
 
 ## Goal
 
-Benchmark a current-generation 27B-class model on the Radeon Pro V620 platform, compare dual-GPU versus single-GPU execution, and evaluate both Q4_K_M and Q8_0 quantizations.
+Benchmark a current-generation 27B-class model on the Radeon Pro V620 platform, compare dual-GPU versus single-GPU execution, evaluate both Q4_K_M and Q8_0 quantizations, and isolate the effect of the RTX 3050 multimodal projector on text-only inference.
 
 ## Model
 
@@ -96,7 +96,7 @@ For Q4_K_M, the single-V620 run was faster for both prompt processing and token 
 
 ## Q8_0 — Single-V620 Run
 
-Qwen3.8-27B Q8_0 was then tested on one V620 at the same 4096-token context.
+Qwen3.8-27B Q8_0 was tested on one V620 at a 4096-token context.
 
 ### Full GPU-Offload Confirmation
 
@@ -119,7 +119,7 @@ Memory allocation:
 
 The CPU-mapped buffer does not indicate CPU layer evaluation; llama.cpp explicitly reported **65/65 model layers offloaded to the V620**.
 
-### Q8 Performance
+### Q8 Performance — Automatic Multimodal Projector Enabled
 
 Measured performance:
 
@@ -146,36 +146,95 @@ Captured active-load sensor snapshot:
 - sclk: **0 Hz**
 - mclk: **96 MHz**
 
-The second V620 again remained essentially idle.
+The second V620 remained essentially idle.
 
 ### Multimodal Projector Observation
 
-The Qwen3.8 GGUF includes multimodal support. During model initialization, llama.cpp automatically loaded the vision projector on the RTX 3050 (`Vulkan0`) while the 27B language model remained on the selected V620.
+The Qwen3.8 GGUF includes multimodal support. During this first Q8 run, llama.cpp automatically loaded the vision projector on the RTX 3050 (`Vulkan0`) while the 27B language model remained on the selected V620.
 
-The vision projector was approximately **600 MiB**, with additional RTX compute-buffer allocation during warmup. This did not change the full-layer offload status of the language model, but it is useful for future multimodal benchmarking because the RTX 3050 can serve as the vision-encoder device while a V620 hosts the language model.
+The vision projector was approximately **600 MiB**, with additional RTX compute-buffer allocation during warmup.
+
+---
+
+## Q8_0 — V620-Only Control Run (`--no-mmproj`)
+
+The Q8 benchmark was repeated with the multimodal projector explicitly disabled using `--no-mmproj` so the RTX 3050 would not participate in the workload.
+
+Verbose output again confirmed:
+
+- **65/65 model layers offloaded to Vulkan1**
+- Vulkan1 model buffer: **25,972.28 MiB**
+- Vulkan1 KV buffer: **256.00 MiB**
+- Vulkan1 recurrent-state buffer: **149.62 MiB**
+- Vulkan1 compute buffer: **158.13 MiB**
+- projected device-memory use: **26,536 MiB**
+- projected free VRAM: **4,001 MiB**
+
+The RTX 3050 was still enumerated as `Vulkan0`, but no vision projector/CLIP model was loaded and no RTX compute allocation occurred for the benchmark.
+
+Measured performance:
+
+- **Prompt processing: 119.9 tokens/s**
+- **Generation: 13.6 tokens/s**
+
+Captured active-load sensor snapshot:
+
+### Active V620
+
+- edge: **75 C**
+- junction: **78 C**
+- memory: **58 C**
+- PPT: **216 W**
+- sclk: **2 GHz**
+- mclk: **1000 MHz**
+
+### Second V620
+
+- edge: **33 C**
+- junction: **35 C**
+- memory: **32 C**
+- PPT: **7 W**
+- sclk: **0 Hz**
+- mclk: **96 MHz**
+
+### Projector-On vs Projector-Off Comparison
+
+| Metric | Q8 + automatic mmproj | Q8 `--no-mmproj` |
+|---|---:|---:|
+| Prompt processing | **119.4 t/s** | **119.9 t/s** |
+| Generation | **13.5 t/s** | **13.6 t/s** |
+| Active V620 junction | **78 C** | **78 C** |
+| Active V620 memory | **58 C** | **58 C** |
+| Active V620 PPT | **217 W** | **216 W** |
+| 27B model layers on V620 | **65/65** | **65/65** |
+| RTX 3050 vision projector | **Loaded** | **Disabled** |
+
+The differences were approximately:
+
+- **+0.4% prompt throughput** with the projector disabled
+- **+0.7% generation throughput** with the projector disabled
+- **1 W lower captured V620 PPT**
+- no change in captured junction or memory temperature
+
+These differences are small enough to be treated as normal run-to-run variation. The control run therefore confirms that the RTX 3050-hosted vision projector had **no material effect on text-only Qwen3.8-27B Q8 inference performance**.
 
 ---
 
 ## Q4_K_M vs Q8_0 — Single V620
 
-| Metric | Q4_K_M | Q8_0 |
+For the cleanest text-only comparison, the Q8 `--no-mmproj` result is used below.
+
+| Metric | Q4_K_M | Q8_0 (`--no-mmproj`) |
 |---|---:|---:|
-| Prompt processing | **136.7 t/s** | **119.4 t/s** |
-| Generation | **19.0 t/s** | **13.5 t/s** |
+| Prompt processing | **136.7 t/s** | **119.9 t/s** |
+| Generation | **19.0 t/s** | **13.6 t/s** |
 | Junction snapshot | **74 C** | **78 C** |
 | Memory temperature | **58 C** | **58 C** |
-| PPT | **205 W** | **217 W** |
+| PPT | **205 W** | **216 W** |
 | Full model-layer GPU offload | **PASS** | **65/65 — PASS** |
 | Approx. projected free VRAM at 4K | More headroom | **~4.0 GiB** |
 
-Relative to Q4_K_M on the same single V620, Q8_0 delivered approximately:
-
-- **12.7% lower prompt-processing throughput**
-- **28.9% lower generation throughput**
-- **12 W higher captured GPU power**
-- **4 C higher captured junction temperature**
-
-The performance cost buys a substantially higher-precision quantization while still fitting entirely on one V620 at a 4K context.
+Q8_0 remains substantially slower than Q4_K_M, but provides a higher-precision quantization while still fitting entirely on one V620 at a 4K context.
 
 ## Operational Implication
 
@@ -183,6 +242,7 @@ For Qwen3.8-27B:
 
 - **Q4_K_M on one V620** is currently the best performance-oriented configuration.
 - **Q8_0 on one V620** is viable when higher quantization fidelity is preferred over maximum throughput.
+- For text-only Q8 use, `--no-mmproj` avoids unnecessarily loading the multimodal projector on the RTX 3050 without materially affecting text generation speed.
 - Splitting Q4 across both V620s reduced performance and is not the preferred topology for this model size.
 - The second V620 can remain available for another model or user while one card runs Qwen3.8-27B.
 - The Q8 configuration has substantially less VRAM headroom than Q4, so larger-context testing should be performed before assuming very long context operation on a single card.
@@ -196,25 +256,29 @@ Dual-GPU execution remains valuable for models that exceed one card's VRAM capac
 | Qwen3.8 27B Q4_K_M dual-GPU run | **PASS** |
 | Qwen3.8 27B Q4_K_M single-GPU run | **PASS** |
 | Qwen3.8 27B Q8_0 single-GPU run | **PASS** |
+| Q8 V620-only `--no-mmproj` control | **PASS** |
 | Q8 full model-layer GPU offload | **65/65 — PASS** |
 | Q4 single-GPU generation | **19.0 t/s** |
-| Q8 single-GPU generation | **13.5 t/s** |
+| Q8 V620-only generation | **13.6 t/s** |
 | Q4 single-GPU prompt processing | **136.7 t/s** |
-| Q8 single-GPU prompt processing | **119.4 t/s** |
+| Q8 V620-only prompt processing | **119.9 t/s** |
 | Q8 active V620 junction | **78 C** |
-| Q8 active V620 PPT | **217 W** |
+| Q8 active V620 PPT | **216 W** |
 | Q8 projected free VRAM at 4K | **~4.0 GiB** |
+| RTX 3050 effect on text-only Q8 throughput | **No material effect observed** |
 | Preferred performance configuration | **Q4_K_M / single V620** |
 | Higher-fidelity single-GPU option | **Q8_0 / single V620** |
 
 ## Engineering Significance
 
-The benchmark demonstrates both topology and quantization tradeoffs on the V620 platform. Qwen3.8-27B can run entirely on a single 32 GB V620 even at Q8_0 precision, while Q4_K_M provides substantially higher generation speed and more memory headroom.
+The benchmark demonstrates topology, quantization, and device-role tradeoffs on the V620 platform. Qwen3.8-27B can run entirely on a single 32 GB V620 even at Q8_0 precision, while Q4_K_M provides substantially higher generation speed and more memory headroom.
 
-This strengthens the final architecture of the local AI server: mid-size models can be pinned to individual V620s, reserving multi-GPU operation for models that genuinely require more than one card's VRAM. The separate RTX 3050 can also participate as a vision-encoder device for multimodal Qwen3.8 workloads.
+The V620-only control also proves that the RTX 3050 is not contributing materially to text-only inference performance when llama.cpp automatically loads the multimodal projector. The RTX can therefore remain reserved for display duties or be deliberately assigned to vision encoding only when multimodal input is actually needed.
+
+This strengthens the final architecture of the local AI server: mid-size language models can be pinned to individual V620s, multi-GPU operation can be reserved for models that genuinely require more than one card's VRAM, and the RTX 3050 can be treated as an optional vision/display accelerator rather than part of the core text-inference path.
 
 ## Next Step
 
 1. Test Q8_0 at larger context sizes to determine the practical single-V620 VRAM ceiling.
 2. Benchmark additional current dense and MoE models using the most appropriate GPU topology.
-3. Add multimodal image-input testing to quantify the RTX 3050 + V620 split architecture.
+3. Add a deliberate multimodal image-input benchmark to quantify the RTX 3050 + V620 split when vision is actually needed.
