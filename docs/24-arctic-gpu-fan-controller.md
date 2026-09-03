@@ -73,19 +73,20 @@ The out-of-tree fan-controller module was installed into the active kernel modul
 
 A small systemd oneshot service was also added. Once the ARCTIC hwmon interface becomes available, the service commands the four V620 cooling fans to a fixed **~90% PWM baseline**.
 
-Manual service validation passed:
+Manual service validation passed, followed by a full reboot validation. After reboot, without any manual module loading or PWM commands:
 
-- service state: active/exited successfully
-- all four channels commanded to PWM 230 (~90%)
-- all four channels returned high-speed RPM feedback in the expected range
+- the ARCTIC kernel module loaded automatically
+- the fan-control service completed successfully
+- all four GPU fan channels returned PWM 230 (~90%)
+- observed fan speeds were approximately 4,029, 3,794, 4,323, and 4,352 RPM
 
-A final reboot validation is still required to confirm that module loading and the 90% fan command occur automatically from a cold/normal boot without manual intervention.
+This confirms that high-airflow GPU fan control is persistent across normal Ubuntu reboots.
 
 ## Current Operating Plan
 
 - Controller hardware startup behavior remains unchanged during POST/BIOS.
-- Once Linux loads, the four dedicated GPU fans are targeted at a fixed ~90% baseline.
-- Reboot persistence will be validated before any additional sustained AI workload.
-- GPU power limiting will be evaluated separately after cooling control is fully verified.
+- Once Linux loads, the four dedicated GPU fans automatically transition to a fixed ~90% baseline.
+- Cooling control is now considered persistent and validated.
+- GPU power limiting will be evaluated separately before additional sustained long-context stress testing.
 
 This fan-controller work was prompted by the earlier long-context stress test, which showed that near-maximum sustained prompt prefill can create substantially higher thermal load than short-prompt inference.
