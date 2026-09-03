@@ -51,6 +51,15 @@ Linux PWM control was then validated. With channels 2–4 commanded to approxima
 
 The substantial RPM increase confirmed that both USB output control and RPM feedback were functioning correctly.
 
+After returning all four channels to the 90% baseline, a later validation showed:
+
+| Channel | PWM | RPM |
+|---|---:|---:|
+| Fan 1 | 230 / ~90% | 4,029 |
+| Fan 2 | 230 / ~90% | 3,794 |
+| Fan 3 | 230 / ~90% | 4,323 |
+| Fan 4 | 230 / ~90% | 4,382 |
+
 ## GPU Idle Check After Reinstallation
 
 After reinstalling both V620s and booting normally, both cards were detected and showed low idle temperatures before any AI workload:
@@ -58,11 +67,25 @@ After reinstalling both V620s and booting normally, both cards were detected and
 - V620 #1: approximately 34 C junction, 6 W
 - V620 #2: approximately 36 C junction, 6 W
 
+## Automatic Linux Fan Control
+
+The out-of-tree fan-controller module was installed into the active kernel module tree and registered for automatic loading during Ubuntu startup.
+
+A small systemd oneshot service was also added. Once the ARCTIC hwmon interface becomes available, the service commands the four V620 cooling fans to a fixed **~90% PWM baseline**.
+
+Manual service validation passed:
+
+- service state: active/exited successfully
+- all four channels commanded to PWM 230 (~90%)
+- all four channels returned high-speed RPM feedback in the expected range
+
+A final reboot validation is still required to confirm that module loading and the 90% fan command occur automatically from a cold/normal boot without manual intervention.
+
 ## Current Operating Plan
 
 - Controller hardware startup behavior remains unchanged during POST/BIOS.
-- Once Linux loads, the four dedicated GPU fans will be commanded to a high fixed baseline speed.
-- Sustained AI workloads will be validated again only after boot-time fan control is made persistent.
+- Once Linux loads, the four dedicated GPU fans are targeted at a fixed ~90% baseline.
+- Reboot persistence will be validated before any additional sustained AI workload.
 - GPU power limiting will be evaluated separately after cooling control is fully verified.
 
 This fan-controller work was prompted by the earlier long-context stress test, which showed that near-maximum sustained prompt prefill can create substantially higher thermal load than short-prompt inference.
