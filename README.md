@@ -1,97 +1,87 @@
-# FWP-003 — Cost-Optimized Local AI / Homelab Server
+# FWP-003 — Cost-Optimized Local AI Server
 
-## Project Overview
+I started this project with a simple question: **how much useful local-AI capability can I get without buying a brand-new high-end workstation?**
 
-FWP-003 is part of my **Fun Weekend Project** series: hands-on technical projects designed to build practical skills and document the engineering process from planning through validation.
+The build uses repurposed enterprise/workstation hardware with a strong focus on cost efficiency, practical performance, and learning through hands-on testing.
 
-The goal of this project is to build a **powerful, cost-effective local AI workstation/server using used enterprise and workstation hardware**, then measure the AI capability achieved for the money spent.
+My goal is not just to assemble the hardware. I want to understand the full stack: Linux, GPU compute, multi-GPU inference, cooling, power, remote administration, model performance, and the tradeoffs that come with using older hardware in a modern AI workload.
 
-Rather than buying a new high-end AI workstation, this project explores a different question:
+[← Back to Fun Weekend Projects](https://github.com/tiwaolagbaju/fun-weekend-projects)
 
-> **How much practical local-AI capability can be achieved per dollar by carefully selecting and repurposing used enterprise hardware?**
+> Public documentation is intentionally sanitized. Credentials, addresses, device identifiers, remote-access details, and other unnecessary operational information are not published.
 
-The finished system will run as a basement homelab server and will be administered remotely from an office workstation.
+## What I’m Building
 
-## Target Outcome
-
-- **64GB aggregate GPU VRAM** from 2× AMD Radeon Pro V620 32GB GPUs
-- **96GB ECC system memory** planned
-- 30B–70B class local LLM inference
-- 70B Q4-class model testing across both GPUs
-- Multi-GPU inference experimentation on AMD hardware
-- Vulkan and ROCm testing where supported
-- CPU/RAM offload experiments for larger models and MoE workloads
-- Browser-based AI access using Open WebUI
-- Remote administration using SSH and VS Code Remote
-- Docker-based services where practical
-- Secure remote connectivity using Tailscale where appropriate
-- Benchmarking focused on **AI capability per dollar**
-
-## Core Hardware
+The system is based on an HP Z6 G4 workstation with two AMD Radeon Pro V620 GPUs.
 
 | Component | Configuration |
 |---|---|
 | Workstation | HP Z6 G4 |
-| CPU | Intel Xeon Platinum 8168 — 24C/48T |
+| CPU | Intel Xeon Platinum 8168 — 24 cores / 48 threads |
 | AI GPUs | 2× AMD Radeon Pro V620 32GB |
-| Aggregate AI VRAM | **64GB** |
-| Display / secondary GPU | NVIDIA RTX 3050 6GB |
-| Planned system RAM | 96GB DDR4-2666 ECC Registered |
-| Primary NVMe | 2TB WD Blue SN5000 |
-| Secondary NVMe | 2TB SanDisk Optimus 5100 |
-| PSU | HP 1000W |
-| V620 cooling | 2 custom shrouds + 4× Noctua NF-A4x20 PWM fans |
+| Aggregate GPU VRAM | **64GB** |
+| Secondary GPU | NVIDIA RTX 3050 6GB |
+| System memory | 96GB ECC planned |
+| Storage | 2× 2TB NVMe |
+| PSU | 1000W |
+| GPU cooling | Custom active cooling for the passive V620 cards |
 
-## Current Documented Spend
+The hardware is intentionally unconventional for a local-AI workstation. That is part of the project: figuring out where used enterprise hardware provides real value and where the compromises start to outweigh the savings.
 
-| Component | Cost |
-|---|---:|
-| 2× Radeon Pro V620 32GB | $850.00 |
-| HP Z6 G4 + Xeon Platinum 8168 | $366.88 |
-| A-Tech ECC RAM purchased to date | $253.81 |
-| 4× Noctua NF-A4x20 fans | $38.03 |
-| 2× V620 cooling shrouds | $50.84 |
-| SanDisk Optimus 5100 2TB | $262.87 |
-| RTX 3050 6GB | Already owned |
-| WD Blue SN5000 2TB | Already owned |
-| **Current documented new spend** | **$1,822.43** |
+## Main Goals
 
-The cost figure will be updated as the build progresses. The final analysis will compare total project spend against the model sizes, inference performance, VRAM capacity, thermals, and overall capability achieved.
+- run larger local language models that benefit from 64GB of aggregate VRAM
+- test single-GPU and multi-GPU inference
+- compare Vulkan and ROCm support where practical
+- experiment with CPU/RAM offload for workloads that exceed GPU memory
+- provide browser-based access to local models
+- manage the system remotely without exposing unnecessary services
+- benchmark performance, thermals, stability, and power behavior
+- compare total spend against the AI capability achieved
+
+## Cost Focus
+
+A big part of this project is **AI capability per dollar**.
+
+Current documented new spending is approximately **$1,822**, with some components reused from hardware I already owned. The final evaluation will look at what that investment can actually run rather than relying on specifications alone.
+
+I plan to compare:
+
+- model size and quantization
+- usable VRAM
+- tokens per second
+- single- vs. dual-GPU behavior
+- system RAM usage
+- thermals and stability
+- power consumption where measurable
+- total project cost
+- cost per GB of GPU VRAM
+- overall usefulness compared with newer alternatives
 
 ## High-Level Architecture
 
 ```text
-Office Workstation
+Client Workstation
       |
-      | Browser / SSH / VS Code Remote
+      | Secure remote administration / browser access
       v
-Home Ethernet
+Local Network
       |
       v
-HP Z6 G4 Local AI Server
+Linux AI Server
       |
-      +-- Ubuntu Linux
-      +-- Docker / Open WebUI
-      +-- llama.cpp / Vulkan / ROCm testing
+      +-- Local model runtime
+      +-- Containerized services
+      +-- Web interface
       |
-      +-- Radeon Pro V620 #1 — 32GB
-      +-- Radeon Pro V620 #2 — 32GB
-      +-- RTX 3050 — display / secondary compute
+      +-- Radeon Pro V620 — 32GB
+      +-- Radeon Pro V620 — 32GB
+      +-- Secondary display / compute GPU
 ```
 
-The public architecture is intentionally simplified. Sensitive addressing, device identifiers, credentials, and remote-access details are not published.
+The public architecture is intentionally simplified. Network addressing, hostnames, device identifiers, authentication details, and remote-access configuration are kept private.
 
-## Planned PCIe Layout
-
-| Slot | Device |
-|---|---|
-| Slot 2 | Radeon Pro V620 #1 |
-| Slot 4 | RTX 3050 |
-| Slot 5 | Radeon Pro V620 #2 |
-
-Final layout will be validated against physical clearance, PCIe resource allocation, NVMe interactions, thermals, and system stability.
-
-## Planned Software Stack
+## Software I’m Exploring
 
 - Ubuntu Linux
 - llama.cpp
@@ -100,109 +90,56 @@ Final layout will be validated against physical clearance, PCIe resource allocat
 - GGUF models
 - Docker / Docker Compose
 - Open WebUI
-- SSH
-- VS Code Remote
-- Tailscale
-- Potential future Proxmox experimentation
+- SSH / remote development tools
 
-## Build Strategy
+I may test additional platforms as the build evolves, but I want the stack to stay understandable and easy to reproduce in my own lab rather than adding tools just for the sake of complexity.
 
-The build will be validated incrementally rather than installing every component at once:
+## Build Approach
 
-1. Project planning and documentation
-2. Baseline Z6 hardware validation
-3. BIOS and PCIe configuration
-4. GPU power solution validation
-5. V620 cooling modification
-6. Single-V620 bring-up and thermal testing
-7. Dual-V620 bring-up
-8. Linux GPU / Vulkan / ROCm configuration
-9. Local AI software deployment
-10. Multi-GPU inference testing
-11. Remote administration and browser access
-12. Benchmarking and cost/performance analysis
-13. Final architecture, troubleshooting summary, lessons learned, and portfolio write-up
+I’m validating the system in stages instead of installing everything at once. That makes troubleshooting much easier when working with older workstation hardware and unusual GPU configurations.
 
-## Benchmarking Goals
+The main phases are:
 
-The final benchmark dataset will capture, where practical:
+1. baseline workstation validation
+2. BIOS and PCIe configuration
+3. power and cooling validation
+4. single-GPU bring-up
+5. dual-GPU bring-up
+6. Linux GPU configuration
+7. local model deployment
+8. multi-GPU testing
+9. remote access and service deployment
+10. benchmarking and cost/performance analysis
 
-- Model family and parameter count
-- Quantization
-- Model file size
-- Backend used
-- Single vs dual GPU
-- VRAM utilization
-- System RAM utilization
-- Prompt-processing and generation performance
-- Tokens per second
-- GPU temperatures
-- Power consumption
-- Stability observations
-- Total build cost
-- Cost per GB of GPU VRAM
-- AI capability achieved per dollar
+## Why This Project Matters to Me
 
-The intent is to **measure value rather than claim it**. Comparisons with newer hardware will be benchmarked or sourced before conclusions are made.
+Most of my professional experience has been around mission-critical electrical infrastructure, where reliability, troubleshooting, and understanding how systems interact are essential.
 
-## Reference Build
-
-A key inspiration for this project is a Country Boy Computers dual-V620 budget AI workstation build demonstrating 64GB aggregate VRAM using used Radeon Pro V620 GPUs:
-
-**YouTube:** https://www.youtube.com/watch?v=8zHUvixZAtg
-
-FWP-003 adapts the concept to an HP Z6 G4 platform and expands it into a remotely administered Linux homelab AI server with deeper documentation, thermal validation, multi-GPU testing, and cost/performance analysis.
-
-## Security & Documentation Policy
-
-This is a public technical portfolio. Documentation will demonstrate architecture, configuration decisions, troubleshooting methodology, testing, and results without publishing information that creates unnecessary risk.
-
-The repository will intentionally omit or sanitize:
-
-- Public IP addresses
-- Credentials and passwords
-- API keys and authentication tokens
-- Tailscale identifiers and sensitive remote-access details
-- MAC addresses
-- Hardware serial and asset identifiers
-- Personally identifying hostnames
-- Wi-Fi credentials
-- Exact private-network information where it adds no technical value
-- Screenshots containing sensitive information
+This project lets me apply that same engineering mindset to IT and AI infrastructure: isolate variables, validate changes, watch thermals and power, troubleshoot methodically, document what worked, and avoid assuming that a configuration is stable just because it boots.
 
 ## Skills Demonstrated
 
-This project is intended to demonstrate practical experience with:
-
 - Linux administration
-- Local AI infrastructure
+- local AI infrastructure
 - GPU compute
-- Multi-GPU configuration
-- AMD Vulkan / ROCm experimentation
+- multi-GPU configuration
 - Docker and service deployment
-- Remote administration
-- SSH and secure connectivity
+- Vulkan / ROCm experimentation
 - PCIe resource planning
-- ECC memory and enterprise workstation hardware
-- GPU power planning
-- Thermal management for passive server GPUs
-- Networking and homelab design
-- Benchmarking and performance analysis
-- Technical troubleshooting
-- Cost/performance engineering
-- Security-conscious technical documentation
+- enterprise workstation hardware
+- power and thermal management
+- remote administration
+- benchmarking and performance analysis
+- cost/performance engineering
+- technical troubleshooting
+- security-conscious documentation
 
-## Project Status
+## Current Status
 
-**Current phase:** Phase 1 — Planning and baseline documentation
+**In progress.** The build is being documented at validated milestones rather than treating planned work as completed work.
 
-**Next milestone:** Validate the HP Z6 G4 in a known-good baseline configuration before installing the V620 GPUs.
-
-## Documentation
-
-- [Project Plan](docs/01-project-plan.md)
-- [Hardware & Cost Tracker](docs/02-hardware-and-cost.md)
+Supporting notes in the `docs/` folder cover project planning and hardware/cost tracking. Additional benchmark and troubleshooting documentation will be added as the system is brought online.
 
 ---
 
-*FWP-003 is an evolving build. Documentation and benchmark results will be updated at validated project checkpoints.*
+**FWP-003** is part of my [Fun Weekend Projects](https://github.com/tiwaolagbaju/fun-weekend-projects) portfolio.
