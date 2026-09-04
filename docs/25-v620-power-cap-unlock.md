@@ -89,10 +89,25 @@ Both cards accepted the requested value and read it back successfully:
 
 This confirms that the patched driver not only exposes a lower range, but also permits a practical below-stock runtime cap to be selected on both installed GPUs.
 
+## Controlled 170 W Load Test
+
+A controlled dual-GPU Qwen3-Coder-Next Q4_K_M inference run was performed before considering the cap for persistent use.
+
+The successful test used a 65,536-token context allocation with an approximately 62,000-token synthetic UPS telemetry prompt. An earlier 32,768-token attempt was rejected cleanly because the prompt exceeded the allocated context and was not treated as a hardware or driver failure.
+
+The successful run completed normally with exit code 0 and reported:
+
+- prompt processing: approximately **673.9 tokens/s**;
+- generation: approximately **43.2 tokens/s**;
+- observed high-load V620 #1: approximately **85 C junction**, **48 C memory**, **161 W PPT**;
+- observed high-load V620 #2: approximately **82 C junction**, **50 C memory**, **163 W PPT**.
+
+The two cards remained reasonably balanced, stayed below the configured thermal stop threshold, and completed the workload successfully.
+
+These results are not a strict A/B comparison with the earlier 258K stress test because the prompt length and workload duration differ. However, they demonstrate substantially improved thermal headroom under a meaningful long-prefill workload with the 170 W cap and high fixed fan baseline in place.
+
 ## Current Status
 
-The two V620s are currently configured with a **temporary 170 W cap** and the dedicated cooling fans remain at their persistent ~90% baseline.
+The dual V620 configuration has now passed a meaningful controlled load at a temporary **170 W per-GPU cap** with the dedicated cooling fans at their persistent ~90% baseline.
 
-The next validation step is a controlled dual-GPU inference workload while monitoring temperature, actual power draw, clocks, and performance. The previous near-maximum long-context stress test will not be repeated until this lower-power configuration has first passed a shorter controlled load.
-
-The 170 W cap will not be made persistent until runtime behavior is validated.
+A final post-load kernel/AMDGPU health check is the remaining validation step before deciding whether to make the 170 W cap persistent at boot. The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
