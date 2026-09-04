@@ -153,12 +153,34 @@ A post-load kernel-health review returned no targeted AMDGPU reset, timeout, VM 
 
 This confirms the updated kernel reproduces the validated power, cooling, stability, and inference behavior of the previous kernel. The prior kernel remains installed as a known-good fallback.
 
+## NVIDIA Display Driver Check During Kernel Upgrade
+
+After the upgraded kernel was promoted, the directly attached display exposed one additional kernel-specific dependency: the RTX 3050 was detected on PCIe, but the NVIDIA kernel module had only been installed for the previous kernel.
+
+The symptoms were:
+
+- `nvidia-smi` could not communicate with the NVIDIA driver;
+- the RTX 3050 had no active `nvidia` kernel driver binding;
+- Vulkan enumeration temporarily contained only the two V620s.
+
+The matching precompiled Ubuntu `595-open` NVIDIA kernel module package was then installed for the upgraded kernel. After reboot:
+
+- `nvidia-smi` successfully detected the RTX 3050;
+- the card reported `Kernel driver in use: nvidia`;
+- GNOME Shell and Xwayland were using the display GPU;
+- Vulkan enumeration returned to the intended layout:
+  - `Vulkan0` — RTX 3050;
+  - `Vulkan1` — V620;
+  - `Vulkan2` — V620.
+
+This final check reinforced that kernel upgrades on this system require validation of all three kernel-dependent components: the patched AMDGPU module, the ARCTIC fan-controller module, and the kernel-specific NVIDIA display-driver module package.
+
 ## Current Status
 
-The dual V620 configuration has now passed runtime, thermal, performance, post-load health, reboot-persistence, and kernel-upgrade validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
+The dual V620 configuration has now passed runtime, thermal, performance, post-load health, reboot-persistence, kernel-upgrade, and display-driver validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
 
-The updated kernel is suitable to become the normal boot target while the previous validated kernel remains available for recovery.
+The upgraded kernel is now suitable for normal use while the previous validated kernel remains installed as a known-good recovery option.
 
-Future kernel upgrades should follow the same pattern: build and verify the AMDGPU power-cap override and ARCTIC fan-controller module for the new kernel before promoting it to normal use.
+Future kernel upgrades should follow the same pattern: build and verify the AMDGPU power-cap override and ARCTIC fan-controller module, confirm the matching NVIDIA kernel module package is present, then validate power, cooling, display, and inference behavior before promoting the new kernel.
 
 The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
