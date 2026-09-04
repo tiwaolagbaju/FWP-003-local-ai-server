@@ -106,8 +106,16 @@ The two cards remained reasonably balanced, stayed below the configured thermal 
 
 These results are not a strict A/B comparison with the earlier 258K stress test because the prompt length and workload duration differ. However, they demonstrate substantially improved thermal headroom under a meaningful long-prefill workload with the 170 W cap and high fixed fan baseline in place.
 
+## Post-Load Health Check
+
+A post-load kernel and PCIe health review showed no matching AMDGPU reset, timeout, VM fault, PCIe/AER error, OOM event, or other targeted failure signature during the test window.
+
+Both V620s also continued to report the configured **170 W** cap after the workload completed.
+
 ## Current Status
 
-The dual V620 configuration has now passed a meaningful controlled load at a temporary **170 W per-GPU cap** with the dedicated cooling fans at their persistent ~90% baseline.
+The dual V620 configuration has now passed runtime, thermal, performance, and post-load health validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
 
-A final post-load kernel/AMDGPU health check is the remaining validation step before deciding whether to make the 170 W cap persistent at boot. The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
+The 170 W setting is considered validated for this system. The next step is to apply the cap automatically at boot and then perform a reboot persistence check.
+
+The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
