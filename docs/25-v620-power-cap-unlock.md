@@ -112,10 +112,24 @@ A post-load kernel and PCIe health review showed no matching AMDGPU reset, timeo
 
 Both V620s also continued to report the configured **170 W** cap after the workload completed.
 
+## Persistent Boot Configuration
+
+A systemd oneshot service was configured to apply the 170 W cap automatically after the AMDGPU hwmon interfaces become available.
+
+A subsequent reboot into the validated kernel confirmed the complete power-and-cooling configuration without manual intervention:
+
+- the V620 power-cap service started successfully;
+- both cards were reduced from the stock 250 W boot value to **170 W**;
+- the ARCTIC fan-control service started successfully;
+- all four dedicated GPU fans returned to PWM 230 (~90%);
+- observed fan speeds after reboot were approximately 4,029, 3,794, 4,323, and 4,352 RPM.
+
+This confirms that both the V620 power cap and GPU fan baseline are persistent across normal reboots on the validated kernel.
+
 ## Current Status
 
-The dual V620 configuration has now passed runtime, thermal, performance, and post-load health validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
+The dual V620 configuration has now passed runtime, thermal, performance, post-load health, and reboot-persistence validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
 
-The 170 W setting is considered validated for this system. The next step is to apply the cap automatically at boot and then perform a reboot persistence check.
+This power-and-cooling configuration is considered validated for the current kernel. Future kernel upgrades require the custom AMDGPU power-cap override and ARCTIC fan-controller module to be rebuilt or otherwise revalidated before the newer kernel becomes the normal boot target.
 
 The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
