@@ -126,10 +126,39 @@ A subsequent reboot into the validated kernel confirmed the complete power-and-c
 
 This confirms that both the V620 power cap and GPU fan baseline are persistent across normal reboots on the validated kernel.
 
+## Kernel Upgrade Validation
+
+The custom AMDGPU power-cap module and ARCTIC fan-controller module were rebuilt for the next Ubuntu kernel while the previously validated kernel was retained as a rollback option.
+
+The newer kernel was then booted and validated end to end. On startup:
+
+- the patched AMDGPU module loaded from the kernel-specific `updates/` override path;
+- both V620s logged the 120 W minimum-power adjustment;
+- the 170 W systemd power-cap service completed successfully on both cards;
+- the ARCTIC fan-controller module loaded for the new kernel;
+- all four GPU fans returned to PWM 230 (~90%);
+- both V620s were visible to the Vulkan backend.
+
+The same approximately 62,000-token dual-GPU workload was repeated on the upgraded kernel. It completed with exit code 0 and produced results effectively identical to the prior validated kernel:
+
+| Metric | Previous validated kernel | Upgraded kernel |
+|---|---:|---:|
+| Prompt processing | ~673.9 tokens/s | ~672.2 tokens/s |
+| Generation | ~43.2 tokens/s | ~43.3 tokens/s |
+| V620 #1 junction | ~85 C | ~84 C |
+| V620 #2 junction | ~82 C | ~84 C |
+| Observed GPU power | ~161 / 163 W | ~163 / 167 W |
+
+A post-load kernel-health review returned no targeted AMDGPU reset, timeout, VM fault, PCIe/AER error, OOM, or related failure signatures.
+
+This confirms the updated kernel reproduces the validated power, cooling, stability, and inference behavior of the previous kernel. The prior kernel remains installed as a known-good fallback.
+
 ## Current Status
 
-The dual V620 configuration has now passed runtime, thermal, performance, post-load health, and reboot-persistence validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
+The dual V620 configuration has now passed runtime, thermal, performance, post-load health, reboot-persistence, and kernel-upgrade validation at **170 W per GPU** with the dedicated cooling fans at their persistent ~90% baseline.
 
-This power-and-cooling configuration is considered validated for the current kernel. Future kernel upgrades require the custom AMDGPU power-cap override and ARCTIC fan-controller module to be rebuilt or otherwise revalidated before the newer kernel becomes the normal boot target.
+The updated kernel is suitable to become the normal boot target while the previous validated kernel remains available for recovery.
+
+Future kernel upgrades should follow the same pattern: build and verify the AMDGPU power-cap override and ARCTIC fan-controller module for the new kernel before promoting it to normal use.
 
 The earlier near-maximum 258K stress workload remains a separate capability test and is not required for normal operation.
