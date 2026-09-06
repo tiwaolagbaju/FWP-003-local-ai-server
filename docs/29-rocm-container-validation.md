@@ -87,16 +87,22 @@ The fallback baseline passed the following checks:
 
 This creates a controlled kernel-only A/B path while keeping the GPU power, cooling, display stack, and Vulkan control baseline unchanged.
 
+### ROCm Discovery-Only Lifecycle Test
+
+On the fallback kernel, a ROCm 7.14 container was launched with only one V620 exposed. Discovery tools were used without launching a HIP compute kernel, and the container was then exited.
+
+The host remained responsive for the observation period after container teardown. Persistent telemetry showed both V620s holding normal idle conditions at roughly 29–30 C junction temperature and 6–7 W board power. The post-test kernel review showed normal boot-time AMDGPU/KFD initialization and no new ring timeout, GPU reset, page fault, watchdog, machine-check, PCIe/AER, or hardware-error event associated with the discovery test.
+
+This stage therefore **passes the ROCm discovery/container-lifecycle check on the fallback kernel**. It does not yet validate HIP compute stability, but it shows that simply initializing ROCm/KFD and tearing down the container did not reproduce the earlier hard lockup during this observation window.
+
 ## Next Step
 
-Do not jump directly back to the previous HIP workload.
+The next ROCm A/B stage should remain deliberately small:
 
-The next ROCm A/B stage should be deliberately smaller and should separate container/KFD lifecycle behavior from actual GPU compute:
-
-1. launch a ROCm container with only one V620 exposed
-2. run discovery only (`rocminfo` / HIP device enumeration), then exit without launching a compute kernel
+1. run one tiny HIP compute iteration on a single V620 using the fallback kernel
+2. exit the container normally
 3. leave the host idle for several minutes with persistent telemetry and journal monitoring
-4. only if that remains stable, run a single tiny HIP compute iteration on one V620 and again observe the host for several minutes after container exit
+4. only if that remains stable, increase the single-GPU HIP workload gradually
 5. do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the kernel A/B path remains stable
 
 No host-side ROCm installation, ECC change, P2P workaround, VBIOS modification, or aggressive PCIe tuning will be performed at this stage.
