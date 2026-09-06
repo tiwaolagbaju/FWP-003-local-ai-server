@@ -49,25 +49,37 @@ After recovery, the validated host state returned normally:
 - both V620 power caps returned to 170 W
 - the dynamic GPU fan-control service returned active
 
+## Post-Cooling Single-GPU Validation
+
+After the replacement V620 cooling fans were installed and thermally validated under the known-good Vulkan workload, ROCm testing resumed conservatively with only one V620 exposed to the container.
+
+For the first V620:
+
+- the container exposed `/dev/kfd` and only the first V620 render node
+- `rocminfo` reported a single `gfx1030` AMD Radeon Pro V620 GPU agent
+- HIP reported exactly one visible GPU
+- a small HIP compute workload completed 20 out of 20 synchronized iterations successfully
+- no AMDGPU, KFD, ring, timeout, reset, PCIe, or AER faults were recorded in the kernel log after the test
+
+The persistent one-second telemetry logger captured only a brief rise in board power because the smoke workload completed faster than the logging interval. This test therefore validates short single-GPU HIP execution and device isolation, but is not a sustained thermal or stability test.
+
 ## Significance
 
-Basic ROCm 7.14 discovery and single-kernel HIP execution are validated on both V620s, but sustained or concurrent ROCm operation is **not yet considered stable** on this platform.
+Basic ROCm 7.14 discovery and single-kernel HIP execution are validated on both V620s. The first post-cooling isolated single-GPU ROCm test also completed successfully with no kernel-level GPU errors observed.
 
-The failed warm restart also suggests that a GPU or PCIe device may not have returned to a clean reset state after the lockup. This is treated as an observation, not a confirmed root cause.
+Sustained or concurrent ROCm operation is **not yet considered fully stable** on this platform.
+
+The failed warm restart after the earlier lockup also suggests that a GPU or PCIe device may not have returned to a clean reset state. This is treated as an observation, not a confirmed root cause.
 
 The known-good Vulkan inference path remains the production/control baseline.
 
 ## Next Step
 
-Pause concurrent ROCm, RCCL, PyTorch multi-GPU, and vLLM testing until the upgraded V620 cooling fans are installed and validated.
+Continue the staged ROCm validation sequence:
 
-Before resuming ROCm work:
-
-1. verify the new cooling hardware and airflow direction
-2. validate fan RPM and fail-safe behavior
-3. confirm both V620s remain at the 170 W power-cap baseline
-4. establish a cold-boot recovery procedure for GPU hangs
-5. resume with one-GPU ROCm tests while logging temperatures, power, and kernel events locally
-6. only then attempt controlled dual-GPU concurrency
+1. repeat the same isolated single-GPU HIP smoke test on the second V620
+2. verify kernel logs remain clean
+3. only after both isolated cards pass, perform a carefully controlled short dual-GPU asynchronous/concurrent scheduling test with persistent telemetry
+4. defer RCCL, PyTorch multi-GPU, P2P experimentation, and vLLM tensor parallelism until that dual-device stage is stable
 
 No host-side ROCm installation, ECC change, P2P workaround, or PCIe tuning will be performed until stability is better understood.
