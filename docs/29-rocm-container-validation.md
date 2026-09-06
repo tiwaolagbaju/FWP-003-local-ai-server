@@ -67,7 +67,7 @@ The second lockup occurred after a single-GPU test with the other V620 not expos
 
 The new cooling solution substantially improved Vulkan thermal behavior, and telemetry before the most recent lockup showed both GPUs cool and idle. Cooling is therefore not the leading explanation for the ROCm lockups.
 
-A GPU/KFD/driver lifecycle, reset, PCIe, or platform interaction remains possible, but the current evidence does not identify a confirmed root cause.
+A GPU/KFD/driver lifecycle, reset, PCIe, SVM/HMM, or platform interaction remains possible, but the current evidence does not identify a confirmed root cause.
 
 The known-good Vulkan inference path remains the production/control baseline.
 
@@ -85,7 +85,7 @@ The fallback baseline passed the following checks:
 - the RTX 3050 loaded with the expected NVIDIA driver
 - Vulkan enumeration remained unchanged: RTX 3050 first, followed by the two V620s
 
-This creates a controlled kernel-only A/B path while keeping the GPU power, cooling, display stack, and Vulkan control baseline unchanged.
+This created a controlled kernel-only A/B path while keeping the GPU power, cooling, display stack, and Vulkan control baseline unchanged.
 
 ### ROCm Discovery-Only Lifecycle Test
 
@@ -93,7 +93,7 @@ On the fallback kernel, a ROCm 7.14 container was launched with only one V620 ex
 
 The host remained responsive for the observation period after container teardown. Persistent telemetry showed both V620s holding normal idle conditions at roughly 29–30 C junction temperature and 6–7 W board power. The post-test kernel review showed normal boot-time AMDGPU/KFD initialization and no new ring timeout, GPU reset, page fault, watchdog, machine-check, PCIe/AER, or hardware-error event associated with the discovery test.
 
-This stage therefore **passes the ROCm discovery/container-lifecycle check on the fallback kernel**. It does not yet validate HIP compute stability, but it shows that simply initializing ROCm/KFD and tearing down the container did not reproduce the earlier hard lockup during this observation window.
+This stage passed the ROCm discovery/container-lifecycle check on the fallback kernel.
 
 ### Tiny HIP Compute Lifecycle Test
 
@@ -101,16 +101,33 @@ The next fallback-kernel test exposed only one V620 and launched a deliberately 
 
 After the container exited normally, the workstation remained responsive through a ten-minute post-workload observation window. Persistent telemetry showed both V620s back at idle conditions around 29–31 C junction temperature and 6–7 W board power. A focused kernel-event review returned no new AMDGPU/KFD fault, ring timeout, GPU reset, page fault, PCIe/AER event, watchdog/lockup report, machine-check, or hardware-error message.
 
-This stage therefore **passes the tiny single-GPU HIP compute + teardown + idle observation checkpoint on the fallback kernel**. The result is encouraging because it did not reproduce the post-ROCm hard lock observed on the newer kernel, but it is still too small a sample to claim full ROCm stability or establish the kernel as the confirmed root cause.
+This stage passed the tiny single-GPU HIP compute + teardown + idle observation checkpoint on the fallback kernel.
 
-## Next Step
+### Fallback-Kernel Hard Lock During Repeated ROCm Container Use
 
-Increase the fallback-kernel ROCm workload gradually while preserving the same single-variable A/B approach:
+The fallback kernel did not remain stable when ROCm testing continued.
 
-1. run five synchronized HIP iterations on V620 #1 only
-2. exit the container and observe the host for ten minutes with telemetry and kernel-event monitoring
-3. if stable, repeat the identical five-iteration test on V620 #2 only
-4. only after both isolated cards pass should the single-GPU workload be increased further
-5. do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the fallback-kernel path remains stable under progressively larger isolated workloads
+After the earlier discovery-only and tiny HIP tests had both completed successfully, another single-V620 ROCm container was launched in preparation for a five-iteration HIP test. Persistent telemetry showed both V620s still at idle immediately beforehand, around 29–30 C and 6–7 W. The journal records the new ROCm container launch, but no normal container teardown or later system activity was preserved before the host became completely unresponsive and required a power cycle.
+
+Because the journal and telemetry stop essentially at the point where the new ROCm container is launched, there is no evidence that the planned five-iteration HIP kernel actually began executing. This means the failure cannot be attributed specifically to the larger compute workload. The reproduced instability may instead involve repeated ROCm/KFD initialization or teardown, HSA/KFD process lifecycle, SVM/HMM state, or another platform/driver interaction.
+
+No pstore record or vmcore was recovered after reboot, and the preserved kernel log again contains no ring timeout, GPU reset, PCIe/AER fault, watchdog panic, MCE, or hardware-error event immediately before the freeze.
+
+The fallback kernel therefore **does not resolve the ROCm hard-lock problem**. The earlier successful tiny test should be treated only as a limited smoke-test pass, not evidence of overall ROCm stability.
+
+## Current Test Policy
+
+ROCm compute and repeated ROCm container testing are paused.
+
+Do not proceed to:
+
+- additional single-GPU HIP stress testing
+- dual-GPU HIP
+- RCCL
+- PyTorch ROCm
+- PCIe P2P experimentation
+- vLLM tensor parallelism
+
+The next investigation should focus on the ROCm/KFD lifecycle and Linux 7.0 AMDGPU/KFD interaction rather than thermal tuning or simply increasing/decreasing HIP workload size. The Vulkan inference path remains the known-good control baseline.
 
 No host-side ROCm installation, ECC change, P2P workaround, VBIOS modification, or aggressive PCIe tuning will be performed at this stage.
