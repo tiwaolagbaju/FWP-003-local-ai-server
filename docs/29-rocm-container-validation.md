@@ -33,14 +33,41 @@ A small HIP kernel was then compiled for `gfx1030` and executed successfully on 
 
 The development image required `/opt/rocm/lib` to be added to the container shell's library search path before the test binary could locate `libamdhip64.so.7`. This was handled only inside the disposable container environment and did not modify the host.
 
+## Stability Incident
+
+During the next stage of ROCm validation, the workstation experienced a complete host lockup. Remote access was lost and the local keyboard/display were also unresponsive, requiring a manual shutdown.
+
+The first restart did not complete normally and stalled during the firmware/POST stage while the passive GPUs were warming. A second full shutdown and restart successfully restored the machine.
+
+The preserved journal from the failed operating-system session ends abruptly without a normal shutdown sequence or a recorded AMDGPU reset, AER, watchdog, thermal, or kernel-panic event. Because the system stopped responding completely, the absence of a final kernel error in the journal does not rule out a GPU/KFD/driver-level hang; the system may have stopped before the relevant diagnostic data could be flushed to disk.
+
+After recovery, the validated host state returned normally:
+
+- kernel remained `7.0.0-31-generic`
+- both V620s were detected by Vulkan
+- the RTX 3050 remained available as the display GPU
+- both V620 power caps returned to 170 W
+- the dynamic GPU fan-control service returned active
+
 ## Significance
 
-This confirms that the current host AMDGPU kernel driver and ROCm 7.14 userspace are compatible with both V620 cards at both the HSA/HIP discovery and basic compute layers. No architecture override was required: both cards identify natively as `gfx1030`.
+Basic ROCm 7.14 discovery and single-kernel HIP execution are validated on both V620s, but sustained or concurrent ROCm operation is **not yet considered stable** on this platform.
 
-The validated host Vulkan stack remains untouched and can continue to serve as the known-good control path.
+The failed warm restart also suggests that a GPU or PCIe device may not have returned to a clean reset state after the lockup. This is treated as an observation, not a confirmed root cause.
+
+The known-good Vulkan inference path remains the production/control baseline.
 
 ## Next Step
 
-Perform a short concurrent dual-GPU HIP test to verify that both V620s can execute work at the same time. Because the replacement GPU cooling fans have not yet been installed, this validation should remain brief and should not be treated as a sustained thermal or performance benchmark.
+Pause concurrent ROCm, RCCL, PyTorch multi-GPU, and vLLM testing until the upgraded V620 cooling fans are installed and validated.
 
-After short concurrent compute is validated, move to PyTorch ROCm device discovery and basic tensor operations. Sustained RCCL, tensor-parallel, and vLLM benchmarking will wait for the upgraded GPU cooling hardware.
+Before resuming ROCm work:
+
+1. verify the new cooling hardware and airflow direction
+2. validate fan RPM and fail-safe behavior
+3. confirm both V620s remain at the 170 W power-cap baseline
+4. establish a cold-boot recovery procedure for GPU hangs
+5. resume with one-GPU ROCm tests while logging temperatures, power, and kernel events locally
+6. only then attempt controlled dual-GPU concurrency
+
+No host-side ROCm installation, ECC change, P2P workaround, or PCIe tuning will be performed until stability is better understood.
