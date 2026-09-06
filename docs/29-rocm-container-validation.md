@@ -33,66 +33,53 @@ A small HIP kernel was then compiled for `gfx1030` and executed successfully on 
 
 The development image required `/opt/rocm/lib` to be added to the container shell's library search path before the test binary could locate `libamdhip64.so.7`. This was handled only inside the disposable container environment and did not modify the host.
 
-## Stability Incident
+## Stability Incidents
+
+### Initial ROCm Lockup
 
 During the next stage of ROCm validation, the workstation experienced a complete host lockup. Remote access was lost and the local keyboard/display were also unresponsive, requiring a manual shutdown.
 
 The first restart did not complete normally and stalled during the firmware/POST stage while the passive GPUs were warming. A second full shutdown and restart successfully restored the machine.
 
-The preserved journal from the failed operating-system session ends abruptly without a normal shutdown sequence or a recorded AMDGPU reset, AER, watchdog, thermal, or kernel-panic event. Because the system stopped responding completely, the absence of a final kernel error in the journal does not rule out a GPU/KFD/driver-level hang; the system may have stopped before the relevant diagnostic data could be flushed to disk.
+The preserved journal from the failed operating-system session ended abruptly without a normal shutdown sequence or a recorded AMDGPU reset, AER, watchdog, thermal, or kernel-panic event. Because the system stopped responding completely, the absence of a final kernel error does not rule out a GPU/KFD/driver-level hang.
 
-After recovery, the validated host state returned normally:
+### Post-Cooling Isolated-GPU Lockup
 
-- kernel remained `7.0.0-31-generic`
-- both V620s were detected by Vulkan
-- the RTX 3050 remained available as the display GPU
-- both V620 power caps returned to 170 W
-- the dynamic GPU fan-control service returned active
+After replacement V620 cooling fans were installed and validated under the known-good Vulkan workload, ROCm testing resumed with one V620 exposed to the container at a time.
 
-## Post-Cooling Single-GPU Validation
+V620 #1 completed 20 out of 20 synchronized HIP iterations successfully. The container exited normally and the host remained responsive.
 
-After the replacement V620 cooling fans were installed and thermally validated under the known-good Vulkan workload, ROCm testing resumed conservatively with one V620 exposed to the container at a time.
+V620 #2 then completed the same 20 out of 20 synchronized HIP iterations successfully. The container also shut down normally. Approximately 14 seconds after container teardown, the host journal stopped, and the workstation subsequently became completely unresponsive and required a power cycle.
 
-### V620 #1
+Persistent telemetry continued after container shutdown and showed both V620s back at idle conditions immediately before the lockup, around 29–31 C junction temperature and 6–7 W board power. This strongly argues against GPU overheating or sustained power load as the immediate cause of this incident.
 
-- the container exposed `/dev/kfd` and only the first V620 render node
-- `rocminfo` reported a single `gfx1030` AMD Radeon Pro V620 GPU agent
-- HIP reported exactly one visible GPU
-- a small HIP compute workload completed 20 out of 20 synchronized iterations successfully
-- no AMDGPU, KFD, timeout, reset, PCIe, or AER faults were recorded in the kernel log after the test
+No AMDGPU, KFD, GPU reset, ring timeout, PCIe/AER, watchdog, OOM, or kernel-panic fault was preserved in the journal before the freeze. The last normal journal activity included the user's post-test kernel-log inspection. The lack of a recorded final fault is consistent with a complete kernel or hardware-level hang that prevented diagnostic data from being flushed.
 
-### V620 #2
+Docker/containerd teardown for both isolated tests appeared normal in the journal. This means the HIP kernel itself can complete successfully while the overall ROCm/KFD lifecycle remains unstable afterward.
 
-The same isolated test was repeated with only the second V620 render node exposed to the container.
+The broad kernel grep also returned Docker virtual-Ethernet `unregistering` messages because the search term `ring` matches that word; these were not GPU ring errors.
 
-- `rocminfo` again reported a single `gfx1030` AMD Radeon Pro V620 GPU agent
-- HIP reported exactly one visible GPU
-- the same HIP compute workload completed 20 out of 20 synchronized iterations successfully
-- no AMDGPU, KFD, timeout, reset, PCIe, or AER faults were recorded after the test
+## Current Interpretation
 
-The persistent one-second telemetry logger captured only brief power changes because both smoke workloads completed faster than the logging interval. These runs therefore validate device isolation and short single-GPU HIP execution on each card independently, but they are not sustained thermal or stability tests.
+The two Radeon Pro V620 GPUs can each execute short isolated ROCm 7.14 / HIP workloads successfully. However, **post-workload ROCm/KFD stability is not validated**, and isolated execution must not be described as stable.
 
-The only lines returned by the broad post-test kernel grep were normal Docker virtual-Ethernet interface teardown messages. They matched the broad expression because `unregistering` contains the substring `ring`; they were not GPU ring faults.
+The second lockup occurred after a single-GPU test with the other V620 not exposed to the container, so simultaneous dual-GPU execution is not required to reproduce the system-level instability.
 
-## Significance
+The new cooling solution substantially improved Vulkan thermal behavior, and telemetry before the most recent lockup showed both GPUs cool and idle. Cooling is therefore not the leading explanation for the ROCm lockups.
 
-Both Radeon Pro V620 GPUs are now independently validated for isolated ROCm 7.14 / HIP execution after the cooling upgrade.
-
-This narrows the remaining stability question to multi-device ROCm behavior rather than basic HIP functionality on either individual GPU.
-
-Sustained or concurrent ROCm operation is **not yet considered fully stable** on this platform.
-
-The failed warm restart after the earlier lockup also suggests that a GPU or PCIe device may not have returned to a clean reset state. This is treated as an observation, not a confirmed root cause.
+A GPU/KFD/driver lifecycle, reset, PCIe, or platform interaction remains possible, but the current evidence does not identify a confirmed root cause.
 
 The known-good Vulkan inference path remains the production/control baseline.
 
 ## Next Step
 
-Continue the staged ROCm validation sequence:
+ROCm compute testing is paused again. Do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the lockup mechanism is better understood.
 
-1. perform a carefully controlled short dual-GPU asynchronous/concurrent scheduling test with both V620s exposed and persistent telemetry running
-2. verify both GPUs complete and kernel logs remain clean
-3. if stable, move to a modest-duration dual-GPU HIP workload before introducing higher-level frameworks
-4. defer RCCL, PyTorch multi-GPU, P2P experimentation, and vLLM tensor parallelism until the dual-device HIP stage is stable
+Next diagnostic work should focus on non-workload evidence collection and controlled A/B testing, including:
 
-No host-side ROCm installation, ECC change, P2P workaround, or PCIe tuning will be performed until stability is better understood.
+1. inspect persistent crash-storage facilities such as pstore/ERST after the hard lockup
+2. improve persistent kernel-event capture so the final seconds before a future hang have a better chance of surviving reboot
+3. compare ROCm/KFD behavior across controlled software variables only after a safe recovery plan is established
+4. preserve the known-good Vulkan configuration and recovery kernel while investigating
+
+No host-side ROCm installation, ECC change, P2P workaround, VBIOS modification, or aggressive PCIe tuning will be performed at this stage.
