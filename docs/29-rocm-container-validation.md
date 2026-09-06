@@ -115,6 +115,16 @@ No pstore record or vmcore was recovered after reboot, and the preserved kernel 
 
 The fallback kernel therefore **does not resolve the ROCm hard-lock problem**. The earlier successful tiny test should be treated only as a limited smoke-test pass, not evidence of overall ROCm stability.
 
+### Post-Reboot Hard Lock During Read-Only Inspection
+
+After the fallback-kernel failure, the workstation rebooted into the newer kernel. The captured terminal sequence on that boot shows read-only inspection of kernel, IOMMU/KFD state, AMDGPU parameters, and PCIe capabilities. Both V620 endpoints reported normal active links and exposed no fatal or non-fatal AER status, although their PCIe device-status fields had correctable-error and unsupported-request bits latched. Both endpoints also reported that PCIe function-level reset is not supported.
+
+The read-only PCIe command completed and returned to the shell prompt. The SSH session was then reset when the host became unresponsive again. No additional ROCm userspace launch is shown in the captured terminal sequence before this failure.
+
+This incident is important because the immediate trigger was not a HIP kernel or an active ROCm benchmark. It suggests the workstation may remain vulnerable to a later platform/driver lock even after a reboot, and further narrows the investigation toward AMDGPU/KFD initialization, device reset/recovery behavior, PCIe/IOMMU interaction, or residual platform state rather than GPU temperature or compute load alone.
+
+The read-only `lspci` inspection itself is not considered proven causal because it had completed before the SSH disconnect.
+
 ## Current Test Policy
 
 ROCm compute and repeated ROCm container testing are paused.
