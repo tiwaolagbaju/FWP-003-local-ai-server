@@ -71,15 +71,32 @@ A GPU/KFD/driver lifecycle, reset, PCIe, or platform interaction remains possibl
 
 The known-good Vulkan inference path remains the production/control baseline.
 
+## Kernel A/B Baseline
+
+To isolate the kernel as a variable, the retained fallback kernel was booted and validated before any further ROCm activity.
+
+The fallback baseline passed the following checks:
+
+- kernel booted successfully
+- patched AMDGPU module matched the running kernel
+- both V620s exposed the expected 120–250 W power-cap range
+- both V620s were automatically capped to 170 W
+- the ARCTIC fan-controller module matched the running kernel and its service was active
+- the RTX 3050 loaded with the expected NVIDIA driver
+- Vulkan enumeration remained unchanged: RTX 3050 first, followed by the two V620s
+
+This creates a controlled kernel-only A/B path while keeping the GPU power, cooling, display stack, and Vulkan control baseline unchanged.
+
 ## Next Step
 
-ROCm compute testing is paused again. Do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the lockup mechanism is better understood.
+Do not jump directly back to the previous HIP workload.
 
-Next diagnostic work should focus on non-workload evidence collection and controlled A/B testing, including:
+The next ROCm A/B stage should be deliberately smaller and should separate container/KFD lifecycle behavior from actual GPU compute:
 
-1. inspect persistent crash-storage facilities such as pstore/ERST after the hard lockup
-2. improve persistent kernel-event capture so the final seconds before a future hang have a better chance of surviving reboot
-3. compare ROCm/KFD behavior across controlled software variables only after a safe recovery plan is established
-4. preserve the known-good Vulkan configuration and recovery kernel while investigating
+1. launch a ROCm container with only one V620 exposed
+2. run discovery only (`rocminfo` / HIP device enumeration), then exit without launching a compute kernel
+3. leave the host idle for several minutes with persistent telemetry and journal monitoring
+4. only if that remains stable, run a single tiny HIP compute iteration on one V620 and again observe the host for several minutes after container exit
+5. do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the kernel A/B path remains stable
 
 No host-side ROCm installation, ECC change, P2P workaround, VBIOS modification, or aggressive PCIe tuning will be performed at this stage.
