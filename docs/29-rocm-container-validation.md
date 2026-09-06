@@ -95,14 +95,22 @@ The host remained responsive for the observation period after container teardown
 
 This stage therefore **passes the ROCm discovery/container-lifecycle check on the fallback kernel**. It does not yet validate HIP compute stability, but it shows that simply initializing ROCm/KFD and tearing down the container did not reproduce the earlier hard lockup during this observation window.
 
+### Tiny HIP Compute Lifecycle Test
+
+The next fallback-kernel test exposed only one V620 and launched a deliberately tiny HIP kernel against 1,024 float elements. The runtime reported one visible HIP device, `hipDeviceSynchronize` returned no error, and the test exited with code 0.
+
+After the container exited normally, the workstation remained responsive through a ten-minute post-workload observation window. Persistent telemetry showed both V620s back at idle conditions around 29–31 C junction temperature and 6–7 W board power. A focused kernel-event review returned no new AMDGPU/KFD fault, ring timeout, GPU reset, page fault, PCIe/AER event, watchdog/lockup report, machine-check, or hardware-error message.
+
+This stage therefore **passes the tiny single-GPU HIP compute + teardown + idle observation checkpoint on the fallback kernel**. The result is encouraging because it did not reproduce the post-ROCm hard lock observed on the newer kernel, but it is still too small a sample to claim full ROCm stability or establish the kernel as the confirmed root cause.
+
 ## Next Step
 
-The next ROCm A/B stage should remain deliberately small:
+Increase the fallback-kernel ROCm workload gradually while preserving the same single-variable A/B approach:
 
-1. run one tiny HIP compute iteration on a single V620 using the fallback kernel
-2. exit the container normally
-3. leave the host idle for several minutes with persistent telemetry and journal monitoring
-4. only if that remains stable, increase the single-GPU HIP workload gradually
-5. do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the kernel A/B path remains stable
+1. run five synchronized HIP iterations on V620 #1 only
+2. exit the container and observe the host for ten minutes with telemetry and kernel-event monitoring
+3. if stable, repeat the identical five-iteration test on V620 #2 only
+4. only after both isolated cards pass should the single-GPU workload be increased further
+5. do not proceed to dual-GPU HIP, RCCL, PyTorch ROCm, P2P experimentation, or vLLM tensor parallelism until the fallback-kernel path remains stable under progressively larger isolated workloads
 
 No host-side ROCm installation, ECC change, P2P workaround, VBIOS modification, or aggressive PCIe tuning will be performed at this stage.
