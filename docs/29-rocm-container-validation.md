@@ -51,21 +51,34 @@ After recovery, the validated host state returned normally:
 
 ## Post-Cooling Single-GPU Validation
 
-After the replacement V620 cooling fans were installed and thermally validated under the known-good Vulkan workload, ROCm testing resumed conservatively with only one V620 exposed to the container.
+After the replacement V620 cooling fans were installed and thermally validated under the known-good Vulkan workload, ROCm testing resumed conservatively with one V620 exposed to the container at a time.
 
-For the first V620:
+### V620 #1
 
 - the container exposed `/dev/kfd` and only the first V620 render node
 - `rocminfo` reported a single `gfx1030` AMD Radeon Pro V620 GPU agent
 - HIP reported exactly one visible GPU
 - a small HIP compute workload completed 20 out of 20 synchronized iterations successfully
-- no AMDGPU, KFD, ring, timeout, reset, PCIe, or AER faults were recorded in the kernel log after the test
+- no AMDGPU, KFD, timeout, reset, PCIe, or AER faults were recorded in the kernel log after the test
 
-The persistent one-second telemetry logger captured only a brief rise in board power because the smoke workload completed faster than the logging interval. This test therefore validates short single-GPU HIP execution and device isolation, but is not a sustained thermal or stability test.
+### V620 #2
+
+The same isolated test was repeated with only the second V620 render node exposed to the container.
+
+- `rocminfo` again reported a single `gfx1030` AMD Radeon Pro V620 GPU agent
+- HIP reported exactly one visible GPU
+- the same HIP compute workload completed 20 out of 20 synchronized iterations successfully
+- no AMDGPU, KFD, timeout, reset, PCIe, or AER faults were recorded after the test
+
+The persistent one-second telemetry logger captured only brief power changes because both smoke workloads completed faster than the logging interval. These runs therefore validate device isolation and short single-GPU HIP execution on each card independently, but they are not sustained thermal or stability tests.
+
+The only lines returned by the broad post-test kernel grep were normal Docker virtual-Ethernet interface teardown messages. They matched the broad expression because `unregistering` contains the substring `ring`; they were not GPU ring faults.
 
 ## Significance
 
-Basic ROCm 7.14 discovery and single-kernel HIP execution are validated on both V620s. The first post-cooling isolated single-GPU ROCm test also completed successfully with no kernel-level GPU errors observed.
+Both Radeon Pro V620 GPUs are now independently validated for isolated ROCm 7.14 / HIP execution after the cooling upgrade.
+
+This narrows the remaining stability question to multi-device ROCm behavior rather than basic HIP functionality on either individual GPU.
 
 Sustained or concurrent ROCm operation is **not yet considered fully stable** on this platform.
 
@@ -77,9 +90,9 @@ The known-good Vulkan inference path remains the production/control baseline.
 
 Continue the staged ROCm validation sequence:
 
-1. repeat the same isolated single-GPU HIP smoke test on the second V620
-2. verify kernel logs remain clean
-3. only after both isolated cards pass, perform a carefully controlled short dual-GPU asynchronous/concurrent scheduling test with persistent telemetry
-4. defer RCCL, PyTorch multi-GPU, P2P experimentation, and vLLM tensor parallelism until that dual-device stage is stable
+1. perform a carefully controlled short dual-GPU asynchronous/concurrent scheduling test with both V620s exposed and persistent telemetry running
+2. verify both GPUs complete and kernel logs remain clean
+3. if stable, move to a modest-duration dual-GPU HIP workload before introducing higher-level frameworks
+4. defer RCCL, PyTorch multi-GPU, P2P experimentation, and vLLM tensor parallelism until the dual-device HIP stage is stable
 
 No host-side ROCm installation, ECC change, P2P workaround, or PCIe tuning will be performed until stability is better understood.
