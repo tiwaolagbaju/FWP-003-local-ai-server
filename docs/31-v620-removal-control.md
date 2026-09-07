@@ -32,6 +32,14 @@ With both V620s physically absent and the ARCTIC module unloaded, the initial ba
 
 The boot log continues to report the platform's existing ACPI/PCIe capability limitations, but no new hardware-error event was identified in this RTX-only state.
 
+## Overnight Stability Checkpoint
+
+The workstation remained powered on and responsive overnight in the RTX-only control configuration, with both V620s physically removed, AMDGPU/KFD absent, V620-specific services disabled, and the custom ARCTIC fan-controller module unloaded.
+
+This is the first extended observation period after the repeated ROCm-era hard locks in which the V620/AMDGPU/KFD path was completely removed from the system. The successful overnight run does not by itself prove a root cause, but it materially strengthens the association between the instability and the removed AMD/V620 path rather than the base Z6 platform.
+
+A separate CPU cooling observation remains open: during a short 24-worker CPU stress test, the CPU package reached around 80 C without an audible automatic fan ramp. The CPU workload itself completed successfully with no reported computation errors. This fan-control behavior is being investigated separately and should not be conflated with the prior V620/ROCm hard-lock issue.
+
 ## Control-Test Goal
 
 Run the workstation normally in this RTX-only configuration for an extended observation period without launching ROCm containers or making additional GPU-driver changes.
