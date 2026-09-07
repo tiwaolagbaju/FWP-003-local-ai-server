@@ -40,3 +40,13 @@ The original CPU-cooler fans will remain installed for the current build.
 For this server, acoustics are a low priority compared with sustained thermal margin and reliability. The validated result provides additional headroom for the future local-agent workload, where the CPU may simultaneously handle orchestration, tokenization, retrieval, tool execution, container services, and other supporting tasks while the GPUs are active.
 
 GPU thermal work remains a separate track. The Radeon Pro V620 cooling hardware is being revised before additional long-duration dual-GPU stress testing.
+
+## Follow-up Fan-Control Check During RTX-Only Baseline
+
+During the later RTX-only hardware-isolation phase, the same 24-worker `stress-ng` workload was repeated to verify the base workstation without either V620 installed. The original CPU fan remained installed and responded audibly when the HP BIOS minimum idle fan setting was manually increased to 40%, confirming that the fan, header, and firmware can command a higher duty level.
+
+However, during a two-minute CPU stress run with the minimum fan setting at 40%, the CPU package temperature reached approximately 80 C without an audible automatic increase above the 40% baseline. The `stress-ng` workload itself completed successfully with all 24 workers passing and no reported computation errors.
+
+This behavior differs from the earlier validated cooling result, where the same style of workload peaked around 72 C. The current observation therefore indicates a CPU fan-control/thermal-policy issue that should be resolved before longer CPU stress testing. The workload result is treated as a functional CPU pass, but not as a renewed thermal-validation pass.
+
+Until the fan-control behavior is understood, longer CPU stress runs and a switch to the `performance` CPU governor are deferred.
