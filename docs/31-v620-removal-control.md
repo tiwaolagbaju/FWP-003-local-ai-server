@@ -70,16 +70,32 @@ The workstation hard-locked again. The final complete pre-freeze sample was capt
 
 The telemetry stream simply stopped after this apparently healthy sample, followed later by a manual reboot. This materially weakens gradual overheating, ordinary ECC memory failure, GPU load, and a conventional logged PCIe AER event as explanations for this occurrence. It does not exclude an abrupt device, driver, power-state, bus-level, or platform stall that prevents the kernel from recording its final state.
 
+## Single-V620 Isolation Result
+
+The next isolation step removed one V620 while leaving the other V620 installed in its existing slot. The workstation was again left in a passive state without ROCm, inference, or GPU stress testing.
+
+The system hard-locked again with only one V620 installed.
+
+This is an important result because it shows that a dual-V620 configuration is not required to reproduce the idle hard lock. The fault domain is therefore narrower than a dual-card-only resource or power interaction, but this result still does not distinguish between:
+
+- the remaining V620 card itself
+- the PCIe slot/path used by the remaining card
+- AMDGPU/KFD/HMM behavior with a single V620 present
+- a platform/firmware interaction triggered by V620 initialization
+
+The next highest-value test is to run the other V620 by itself while changing as little else as possible. Depending on the result, a card-versus-slot swap test can then determine whether the failure follows a specific GPU or a specific PCIe path.
+
 ## Current Interpretation
 
 The evidence now supports a narrower hardware/software isolation path:
 
 - the base system remained stable for an extended period with both V620s physically absent
-- passive dual-V620 operation can still hard-lock the workstation without a ROCm userspace workload
-- the final pre-freeze telemetry remained cool and lightly loaded
+- passive dual-V620 operation can hard-lock the workstation without a ROCm userspace workload
+- passive single-V620 operation can also hard-lock the workstation
+- the final pre-freeze dual-V620 telemetry remained cool and lightly loaded
 - no obvious EDAC, RAS, or endpoint-AER precursor was captured
 
-The next controlled step should isolate one V620 at a time. If both individual cards are stable alone but instability returns only with two cards installed, the investigation should focus on dual-device AMDGPU/KFD/HMM behavior, PCIe/platform interaction, resource mapping, or power-delivery interaction rather than a single defective card.
+This makes raw thermal overload, ordinary ECC memory failure, or dual-card compute load less consistent with the observed failures. The remaining investigation should focus on card-specific behavior, PCIe path/slot behavior, AMDGPU/KFD/HMM initialization/state, and platform interaction.
 
 ## Safety / Test Policy
 
