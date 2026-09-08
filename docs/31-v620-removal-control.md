@@ -36,35 +36,51 @@ The boot log continues to report the platform's existing ACPI/PCIe capability li
 
 The workstation remained powered on and responsive overnight in the RTX-only control configuration, with both V620s physically removed, AMDGPU/KFD absent, V620-specific services disabled, and the custom ARCTIC fan-controller module unloaded.
 
-This is the first extended observation period after the repeated ROCm-era hard locks in which the V620/AMDGPU/KFD path was completely removed from the system. The successful overnight run does not by itself prove a root cause, but it materially strengthens the association between the instability and the removed AMD/V620 path rather than the base Z6 platform.
+This was the first extended observation period after the repeated ROCm-era hard locks in which the V620/AMDGPU/KFD path was completely removed from the system. The successful overnight run does not by itself prove a root cause, but it materially strengthens the association between the instability and the removed AMD/V620 path rather than the base Z6 platform.
 
-A separate CPU cooling observation remains open: during a short 24-worker CPU stress test, the CPU package reached around 80 C without an audible automatic fan ramp. The CPU workload itself completed successfully with no reported computation errors. This fan-control behavior is being investigated separately and should not be conflated with the prior V620/ROCm hard-lock issue.
+A separate CPU cooling observation remains open: during a short 24-worker CPU stress test, the CPU package reached around 80 C without an audible automatic fan ramp. The CPU workload itself completed successfully with no reported computation errors. This fan-control behavior is being investigated separately and should not be conflated with the V620-related hard-lock issue.
 
 ## Dual-V620 Reinstallation Result
 
-After the successful RTX-only overnight control period, both V620s were reinstalled for a passive stability observation. Before the reinstallation test, the nearby intake fan was repositioned so it no longer blew directly into the V620 cooling-fan path, and the GPU cooling baseline was raised.
+After the successful RTX-only overnight control period, both V620s were reinstalled for passive stability observation. Before the reinstallation test, the nearby intake fan was repositioned so it no longer blew directly into the V620 cooling-fan path, and the GPU cooling baseline was raised.
 
-The workstation later froze again with both V620s installed. No conclusion should be drawn from the airflow change alone; moving the intake fan and increasing cooling did not prevent the recurrence.
+The workstation later froze again with both V620s installed. No ROCm workload, inference workload, or stress test was required to reproduce the failure.
 
-This result further weakens the intake-fan-interference hypothesis as a complete explanation and strengthens the association between system instability and the presence of the V620/AMDGPU/KFD/PCIe path. It still does not distinguish between a specific card, a specific PCIe path, the AMDGPU/KFD stack, or another platform interaction.
+This result weakens the intake-fan-interference hypothesis as a complete explanation and strengthens the association between system instability and the presence of the V620/AMDGPU/KFD/PCIe path. It still does not distinguish between a specific card, a specific PCIe path, the AMDGPU/KFD stack, or another platform interaction.
 
-## Control-Test Goal
+## Passive Flight-Recorder Capture
 
-Run the workstation normally in this RTX-only configuration for an extended observation period without launching ROCm containers or making additional GPU-driver changes.
+A full-system telemetry recorder was enabled during a later passive dual-V620 observation. The recorder sampled temperatures, GPU power, fan RPM, system load, memory state, GPU PCIe link state, endpoint AER counters, and EDAC counters while the system was otherwise left idle.
 
-Interpretation:
+The workstation hard-locked again. The last preserved pre-freeze telemetry showed no obvious thermal or hardware-error precursor:
 
-- if the workstation remains stable, the repeated lockups become strongly associated with the V620/AMDGPU/KFD/PCIe side of the system
-- if the workstation still hard-locks, the investigation must broaden to the platform, memory, CPU, power, kernel, or NVIDIA side
+- CPU temperature remained in a normal idle range
+- both V620 PCIe endpoints remained in D0 with full-width links
+- endpoint PCIe AER corrected, non-fatal, and fatal counters remained at zero
+- EDAC corrected and uncorrected memory counters remained at zero
+- no persistent RAS record was recovered after reboot
+- pstore contained no crash record
+- the previous-boot kernel journal contained no GPU reset, ring timeout, machine-check, watchdog, thermal, OOM, or explicit PCIe fault near the hard lock
 
-## Current Policy
+The kernel journal simply stopped without recording a normal shutdown or a clear fault sequence. This does not identify the root cause, but it further weakens temperature, ordinary ECC memory failure, and a conventional logged PCIe AER event as explanations for this particular occurrence.
 
-During the RTX-only control period:
+## Current Interpretation
+
+The evidence now supports a narrower hardware/software isolation path:
+
+- the base system remained stable for an extended period with both V620s physically absent
+- passive dual-V620 operation can still hard-lock the workstation without a ROCm userspace workload
+- no obvious thermal, EDAC, RAS, or endpoint-AER precursor was captured
+
+The next controlled step should isolate one V620 at a time. If both individual cards are stable alone but instability returns only with two cards installed, the investigation should focus on dual-device AMDGPU/KFD/HMM behavior, PCIe/platform interaction, resource mapping, or power-delivery interaction rather than a single defective card.
+
+## Safety / Test Policy
+
+Until the isolation matrix is complete:
 
 - do not launch ROCm containers
-- do not reinstall either V620
-- do not change IOMMU or PCIe settings
-- keep V620-specific power-cap and cooling automation disabled
-- keep the custom ARCTIC fan-controller module unloaded unless it is specifically needed for a later controlled test
-
-After a sufficiently long stable control period, the next hardware isolation step should be to reinstall only one V620 and repeat validation one card at a time rather than returning directly to the dual-V620 configuration.
+- do not run GPU stress workloads during passive-control tests
+- avoid changing IOMMU or PCIe settings at the same time as a hardware-isolation test
+- change only one major variable per test
+- retain the known-good recovery kernel
+- keep diagnostic logs sanitized before publishing
