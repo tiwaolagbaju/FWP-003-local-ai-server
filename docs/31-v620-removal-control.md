@@ -52,17 +52,23 @@ This result weakens the intake-fan-interference hypothesis as a complete explana
 
 A full-system telemetry recorder was enabled during a later passive dual-V620 observation. The recorder sampled temperatures, GPU power, fan RPM, system load, memory state, GPU PCIe link state, endpoint AER counters, and EDAC counters while the system was otherwise left idle.
 
-The workstation hard-locked again. The last preserved pre-freeze telemetry showed no obvious thermal or hardware-error precursor:
+The workstation hard-locked again. The final complete pre-freeze sample was captured after roughly 3 hours and 38 minutes of uptime and showed a very light system load with no thermal or hardware-error trend immediately before logging stopped:
 
-- CPU temperature remained in a normal idle range
-- both V620 PCIe endpoints remained in D0 with full-width links
+- CPU package about 30 C, with cores in the mid-20s to low-30s C
+- both V620 edge temperatures about 26 C
+- V620 junction temperatures about 28-29 C
+- V620 memory temperatures about 26-28 C
+- both V620s at only about 6-7 W and effectively idle clocks
+- RTX 3050 about 32 C and about 6 W
+- PCH about 39 C
+- both V620 PCIe endpoints remained D0 with full-width links
 - endpoint PCIe AER corrected, non-fatal, and fatal counters remained at zero
 - EDAC corrected and uncorrected memory counters remained at zero
 - no persistent RAS record was recovered after reboot
 - pstore contained no crash record
 - the previous-boot kernel journal contained no GPU reset, ring timeout, machine-check, watchdog, thermal, OOM, or explicit PCIe fault near the hard lock
 
-The kernel journal simply stopped without recording a normal shutdown or a clear fault sequence. This does not identify the root cause, but it further weakens temperature, ordinary ECC memory failure, and a conventional logged PCIe AER event as explanations for this particular occurrence.
+The telemetry stream simply stopped after this apparently healthy sample, followed later by a manual reboot. This materially weakens gradual overheating, ordinary ECC memory failure, GPU load, and a conventional logged PCIe AER event as explanations for this occurrence. It does not exclude an abrupt device, driver, power-state, bus-level, or platform stall that prevents the kernel from recording its final state.
 
 ## Current Interpretation
 
@@ -70,7 +76,8 @@ The evidence now supports a narrower hardware/software isolation path:
 
 - the base system remained stable for an extended period with both V620s physically absent
 - passive dual-V620 operation can still hard-lock the workstation without a ROCm userspace workload
-- no obvious thermal, EDAC, RAS, or endpoint-AER precursor was captured
+- the final pre-freeze telemetry remained cool and lightly loaded
+- no obvious EDAC, RAS, or endpoint-AER precursor was captured
 
 The next controlled step should isolate one V620 at a time. If both individual cards are stable alone but instability returns only with two cards installed, the investigation should focus on dual-device AMDGPU/KFD/HMM behavior, PCIe/platform interaction, resource mapping, or power-delivery interaction rather than a single defective card.
 
