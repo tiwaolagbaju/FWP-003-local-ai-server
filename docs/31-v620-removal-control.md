@@ -74,16 +74,29 @@ The telemetry stream simply stopped after this apparently healthy sample, follow
 
 The next isolation step removed one V620 while leaving the other V620 installed in its existing slot. The workstation was again left in a passive state without ROCm, inference, or GPU stress testing.
 
-The system hard-locked again with only one V620 installed.
+The system hard-locked again with only one V620 installed. The previous boot lasted about 1 hour and 35 minutes before logging stopped abruptly.
 
-This is an important result because it shows that a dual-V620 configuration is not required to reproduce the idle hard lock. The fault domain is therefore narrower than a dual-card-only resource or power interaction, but this result still does not distinguish between:
+The final complete flight-recorder sample immediately before the lock again showed an apparently healthy, idle machine:
 
-- the remaining V620 card itself
-- the PCIe slot/path used by the remaining card
-- AMDGPU/KFD/HMM behavior with a single V620 present
-- a platform/firmware interaction triggered by V620 initialization
+- CPU package about 34 C
+- system load well below 1
+- more than 89 GB of system memory free and swap unused
+- the remaining V620 at about 29 C edge, 32 C junction, and 30 C memory temperature
+- the V620 at about 6 W with core clock reported at 0 Hz and memory clock at 96 MHz
+- the RTX 3050 at about 30 C, about 5 W, and idle performance state
+- PCH about 41 C
+- the V620 PCIe endpoint remained in D0 at full x16 link width
+- PCIe AER corrected, non-fatal, and fatal counters remained at zero
+- EDAC corrected and uncorrected memory counters remained at zero
+- no failed systemd units were recorded
+- no kernel messages were preserved in the final several-minute window around the stop
+- pstore remained empty and no persistent RAS record was recovered
 
-The next highest-value test is to run the other V620 by itself while changing as little else as possible. Depending on the result, a card-versus-slot swap test can then determine whether the failure follows a specific GPU or a specific PCIe path.
+The journal boundary ended at essentially the same point as the final telemetry sample, with no orderly shutdown sequence. This is consistent with another abrupt hard lock rather than a gradual thermal shutdown or normal reboot.
+
+This is an important result because it shows that two V620s are not required to reproduce the idle hard lock. However, the system still contained both an NVIDIA GPU and an AMD V620, so a broader mixed-GPU or GPU power-state interaction is not excluded.
+
+The repeated failures while the V620 is extremely cool, drawing only a few watts, and sitting at minimum reported clocks make idle-state, DPM/power-state transition, driver-state, PCIe-path, or platform interaction more interesting than raw thermal or compute-load explanations. This remains a hypothesis rather than a confirmed root cause.
 
 ## Current Interpretation
 
@@ -92,10 +105,12 @@ The evidence now supports a narrower hardware/software isolation path:
 - the base system remained stable for an extended period with both V620s physically absent
 - passive dual-V620 operation can hard-lock the workstation without a ROCm userspace workload
 - passive single-V620 operation can also hard-lock the workstation
-- the final pre-freeze dual-V620 telemetry remained cool and lightly loaded
-- no obvious EDAC, RAS, or endpoint-AER precursor was captured
+- both dual- and single-V620 final telemetry remained cool and lightly loaded
+- no obvious EDAC, RAS, endpoint-AER, thermal, or workload precursor was captured
 
-This makes raw thermal overload, ordinary ECC memory failure, or dual-card compute load less consistent with the observed failures. The remaining investigation should focus on card-specific behavior, PCIe path/slot behavior, AMDGPU/KFD/HMM initialization/state, and platform interaction.
+This makes raw thermal overload, ordinary ECC memory failure, or dual-card compute load less consistent with the observed failures. The remaining investigation should focus on card-specific behavior, PCIe path/slot behavior, AMDGPU/KFD/HMM state, idle/power-management behavior, and platform interaction.
+
+The next highest-value hardware test remains running the other V620 by itself in the same PCIe path, changing no other major variables. If both cards fail individually in the same path, suspicion shifts away from a single defective card and toward the common platform/driver/power-state path.
 
 ## Safety / Test Policy
 
