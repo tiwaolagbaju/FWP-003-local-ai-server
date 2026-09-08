@@ -98,6 +98,16 @@ This is an important result because it shows that two V620s are not required to 
 
 The repeated failures while the V620 is extremely cool, drawing only a few watts, and sitting at minimum reported clocks make idle-state, DPM/power-state transition, driver-state, PCIe-path, or platform interaction more interesting than raw thermal or compute-load explanations. This remains a hypothesis rather than a confirmed root cause.
 
+## Second Single-V620 Card Result
+
+The other V620 was then installed by itself in the same test position, while keeping the RTX 3050 and the rest of the configuration unchanged. The system was again left without ROCm, inference, or stress workloads.
+
+This second V620 also reproduced the hard freeze.
+
+Because two different V620 cards can now reproduce the failure individually in the same system configuration, a single defective V620 is substantially less likely as the sole explanation. This result does not yet distinguish between the shared PCIe path, the AMDGPU/KFD/HMM stack, mixed NVIDIA/AMD GPU behavior, idle/DPM power-state transitions, or another Z6 platform/firmware interaction.
+
+Detailed pre-freeze telemetry for this second-card event should be reviewed before drawing further conclusions about its immediate state at failure.
+
 ## Current Interpretation
 
 The evidence now supports a narrower hardware/software isolation path:
@@ -105,12 +115,13 @@ The evidence now supports a narrower hardware/software isolation path:
 - the base system remained stable for an extended period with both V620s physically absent
 - passive dual-V620 operation can hard-lock the workstation without a ROCm userspace workload
 - passive single-V620 operation can also hard-lock the workstation
-- both dual- and single-V620 final telemetry remained cool and lightly loaded
-- no obvious EDAC, RAS, endpoint-AER, thermal, or workload precursor was captured
+- two different V620 cards can reproduce the failure individually in the same test configuration
+- the previously captured dual- and single-V620 final telemetry remained cool and lightly loaded
+- no obvious EDAC, RAS, endpoint-AER, thermal, or workload precursor was captured in the reviewed events
 
-This makes raw thermal overload, ordinary ECC memory failure, or dual-card compute load less consistent with the observed failures. The remaining investigation should focus on card-specific behavior, PCIe path/slot behavior, AMDGPU/KFD/HMM state, idle/power-management behavior, and platform interaction.
+This makes raw thermal overload, ordinary ECC memory failure, dual-card compute load, and a single bad V620 less consistent with the observed failures. The remaining investigation should focus on the common PCIe path/platform behavior, AMDGPU/KFD/HMM state, mixed-GPU interaction, and idle/power-management behavior.
 
-The next highest-value hardware test remains running the other V620 by itself in the same PCIe path, changing no other major variables. If both cards fail individually in the same path, suspicion shifts away from a single defective card and toward the common platform/driver/power-state path.
+A useful next software A/B test is to keep the same one-V620 hardware configuration and deliberately alter only the V620's idle/power-management behavior. Before that test, preserve the second-card freeze telemetry and previous-boot journal so the current event is fully documented.
 
 ## Safety / Test Policy
 
