@@ -24,32 +24,38 @@ The validated test kept the following conditions unchanged:
 
 The only intentional hardware change relative to prior failing runs was use of a different GPU auxiliary power cable.
 
-## Result
+## New-Cable Result
 
 The system remained stable well beyond the previously observed single-V620 failure windows while using the new power cable in the same PCIe position that had repeatedly hard-locked before.
 
-This result is considered a successful passive stability checkpoint.
+This result was initially considered a successful passive stability checkpoint and strengthened suspicion of the previous cable or connection quality.
 
-## Interpretation
+## Reverse A/B With the Prior Cable
 
-The result materially weakens the hypothesis that the PCIe slot/path alone is sufficient to cause the hard lock. It strengthens suspicion of the prior auxiliary power cable or its connection quality as a contributing factor.
+The prior GPU power cable was then reinstalled while keeping the same V620, same PCIe position, same BIOS, same kernel/driver stack, same 170 W cap, same `auto` DPM policy, and the same passive observation method.
 
-However, the prior cable should not yet be called definitively defective. A blank connector position by itself is not sufficient evidence of a fault because some workstation GPU power cables intentionally leave a position unpopulated depending on the connector design.
+The reverse A/B baseline began late in the evening and remained stable for more than seven and a half hours, exceeding all previously well-recorded single-V620 passive failure windows, including the roughly 1.5-hour, 3.5-hour, and roughly 5-hour observations.
 
-The remaining possibilities include:
+At startup for this reverse test, the V620 was cool and idle, with the same low-power state seen in prior passive tests, and the V620 power-cap, fan-control, and flight-recorder services were all active.
 
-- intermittent contact or terminal fit on the prior cable
-- conductor or crimp resistance on the prior cable
-- connector seating differences
-- interaction between auxiliary power quality and GPU power-state transitions
-- a lower-probability platform/PCIe interaction that has not reproduced during the current run
+## Updated Interpretation
 
-## Next Isolation Step
+Because both the new-cable and prior-cable configurations have now remained stable for substantially longer than the earlier repeatable failure windows in the same PCIe position, the auxiliary power cable is no longer a strong standalone root-cause explanation.
 
-A deliberate reverse A/B test can further distinguish cable from slot/path behavior by reconnecting the prior GPU power cable while keeping the same GPU, PCIe position, BIOS, kernel, driver, DPM policy, and monitoring configuration unchanged.
+The prior cable is therefore not considered proven defective. The intentionally unpopulated connector position observed on that cable should not be treated as fault evidence by itself.
 
-Because a power cable under investigation could theoretically have a poor electrical connection, any reuse should be treated cautiously and the connector should be inspected for heat damage, discoloration, recessed terminals, or poor mechanical fit before continued operation.
+One important troubleshooting confounder was discovered during the recent single-GPU testing: the original ARCTIC fan-control script required at least two AMDGPU hwmon devices. In a one-V620 configuration, this caused the service to enter fail-safe, set maximum fan PWM, exit, and restart repeatedly. The script was later corrected to support either one or two V620s. Although this restart loop does not explain earlier dual-V620 hard locks, it means some previous single-V620 passive failures occurred under a different service behavior than the current stable runs and should be interpreted with that limitation in mind.
+
+The remaining fault domain therefore still includes:
+
+- AMDGPU/KFD/HMM or GPU lifecycle behavior
+- mixed NVIDIA/AMD interaction
+- PCIe/platform behavior that is intermittent rather than strictly slot-dependent
+- system firmware or processor/platform power-state interactions
+- another condition that changed between the earlier failure period and the current stable observations
 
 ## Current Status
 
-The new-cable / original-slot configuration is the strongest stable single-V620 control achieved so far and is now the preferred reference configuration for subsequent testing.
+The current single-V620 configuration has now remained stable through both cable variants in the previously problematic PCIe position. This materially weakens both a simple bad-slot explanation and a simple bad-cable explanation.
+
+Further testing should continue to change only one major variable at a time. A useful next isolation step is V620-only headless operation with the RTX 3050 physically removed, after preserving the current stable checkpoint. ROCm execution should remain paused until the underlying full-system hard-lock behavior is better understood.
